@@ -11,7 +11,7 @@ Agentgaurd is a Python backend that plans tool use before execution, applies det
 - Phase 08: optional AgentDojo Track B adapter with fail-closed risk mapping, sink metadata, profile configuration, capped pair batching, and a subprocess entry point. AgentDojo is not required by the main environment.
 - Phase 09: FastAPI endpoints for conversations, messages, runs, SSE event streaming, decisions, statistics, evaluation batches, mock data, and configuration; JSONL audit logs indexed in SQLite; log reindexing.
 
-The Next.js user interface is Phase 10 and is not included.
+A local agent workspace frontend is included in `frontend/` and is served at the API root.
 
 ## Install and test
 
@@ -136,3 +136,22 @@ python -m demo.scenarios
 ```
 
 The API is a local demo service, not a production deployment: it has no authentication, operational hardening, or multi-user isolation.
+
+## Agent workspace frontend
+
+Open http://localhost:8000/ after starting the API. The frontend opens directly to
+Overview with no login or landing page. It is served by FastAPI from `frontend/`,
+so no separate Node server or frontend build is required.
+
+The workspace includes agent runs with live SSE execution events, analytics,
+Email/Slack/Banking agent tasks and mock data, injection scenarios, evaluation
+batches, audit decisions, JSON exports, and browser-local execution preferences.
+The interface uses the existing REST API. OpenRouter credentials stay in the
+backend environment. Agent data is mock data, not live connected accounts.
+
+For the Python environment prepared in this workspace:
+
+```powershell
+cd backend
+.\.venv312\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
