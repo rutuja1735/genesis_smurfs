@@ -1,4 +1,8 @@
-"""Argument origin tracking over raw tool outputs."""
+"""Argument origin tracking over raw tool outputs.
+
+Provenance is run on RAW output only; the sanitized view is never used for
+provenance lookups (Section 22 rule 17).
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,35 @@ from enum import Enum
 from typing import Any
 
 from .registry import ToolSpec
+
+
+def extract_bare_address(addr: str) -> str:
+    """Extract the bare email address from a display-name form.
+
+    'Alice <alice@example.com>' -> 'alice@example.com'
+    'alice@example.com' -> 'alice@example.com'
+
+    Lowercased for case-insensitive comparison. This protects against the
+    display-name spoofing trick:
+    'Alice <attacker@evil.com>' where the display name matches a trusted
+    contact but the address does not.
+    """
+    addr = addr.strip()
+    angle = re.search(r"<([^>]+)>", addr)
+    if angle:
+        return angle.group(1).strip().lower()
+    if "@" in addr:
+        return addr.lower()
+    return addr.lower()
+
+
+def is_trusted_address(candidate: str, trusted: str) -> bool:
+    """Return True iff the bare addresses match (case-insensitive).
+
+    Never compare raw header values directly — always extract bare addresses
+    first to defeat display-name tricks.
+    """
+    return extract_bare_address(candidate) == extract_bare_address(trusted)
 
 
 class Origin(str, Enum):

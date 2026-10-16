@@ -19,7 +19,7 @@ from .provenance import Origin, Provenance
 from .prompts import json_text, unknown_value, untrusted_block
 from .registry import ToolRegistry
 from .resolver import Resolver
-from .scanner import scan_output
+from .scanner import scan_output, scan_hidden_text_removed
 from .types import LLMClient
 
 
@@ -333,6 +333,26 @@ class Executor:
         for event in view.events:
             if self.audit:
                 self.audit.write("INJECTION_NEUTRALIZED", node=node.id, field=event.get("field"), mode=view.mode, severity=event.get("severity"), excerpt=event.get("excerpt"), spans=scan_count)
+        # Hidden-text signal: if an email tool stripped hidden HTML blocks,
+        # emit a medium-severity injection suspected event (Section 6 requirement).
+        hidden_count = 0
+        if isinstance(raw_output, dict):
+            hidden_count = int(raw_output.get("hidden_text_removed", 0) or 0)
+            # For list outputs (list_inbox), check individual emails
+            for email_item in raw_output.get("emails", []):
+                if isinstance(email_item, dict):
+                    hidden_count += int(email_item.get("hidden_text_removed", 0) or 0)
+        hidden_signal = scan_hidden_text_removed(hidden_count)
+        if hidden_signal and self.audit:
+            self.audit.write(
+                "INJECTION_SUSPECTED",
+                node=node.id,
+                field="hidden_text_removed",
+                severity=hidden_signal.severity,
+                matched=["hidden_text_removed"],
+                excerpt=hidden_signal.matches[0].excerpt if hidden_signal.matches else "",
+            )
+
 
     def _record_gate(self, decision: Decision, node: PlanNode, **fields: Any) -> None:
         if self.audit:

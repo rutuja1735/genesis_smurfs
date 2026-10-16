@@ -89,3 +89,28 @@ def scan_output(output: object) -> dict[str, ScanResult]:
 
     visit(output)
     return found
+
+
+def scan_hidden_text_removed(hidden_text_removed: int) -> ScanResult | None:
+    """Return a medium-severity ScanResult when hidden_text_removed > 0.
+
+    A positive count means the MIME parser stripped invisible-HTML content
+    from the message body, which is a classic injection vector. Feed this
+    signal into the executor's injection detection path.
+
+    Returns None when hidden_text_removed == 0 (no signal to report).
+    """
+    if hidden_text_removed <= 0:
+        return None
+    match = ScanMatch(
+        severity="med",
+        matched="hidden_text_removed",
+        start=0,
+        end=0,
+        excerpt=(
+            f"Email contained {hidden_text_removed} hidden HTML block(s) "
+            "that were stripped before processing. This is a medium-severity "
+            "injection signal."
+        ),
+    )
+    return ScanResult("med", (match,))

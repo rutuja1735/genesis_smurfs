@@ -10,7 +10,7 @@ from typing import Any
 import networkx as nx
 
 from .graph import PlanGraph, PlanNode, build_dag
-from .provenance import Origin, Provenance
+from .provenance import Origin, Provenance, extract_bare_address
 from .registry import ToolRegistry, ToolSpec
 from .scanner import scan_text
 
@@ -154,6 +154,22 @@ class PolicyGate:
                 allowed_domains = {item.rsplit("@", 1)[-1].lower() for item in known_addresses if "@" in item}
                 if email.rsplit("@", 1)[-1].lower() not in allowed_domains:
                     return self._decision("R6", DecisionAction.BLOCK, tool=tool, recipient=email)
+        # R6(c): outgoing recipient domain must be internal, a trusted contact,
+        # or explicitly mentioned in the user command.
+        recipient_args = [key for key, kind in spec.sink_params.items() if kind == "recipient" and key in args]
+        if recipient_args and spec.risk in {"write", "high_impact"}:
+            known_addresses = ctx.trusted_contacts | set(_EMAIL.findall(ctx.user_command))
+            allowed_domains = {extract_bare_address(a).rsplit("@", 1)[-1].lower() for a in known_addresses if "@" in a}
+            allowed_domains |= {d.lower() for d in ctx.profile.get("internal_domains", [])}
+            to_value = args.get("to", [])
+            recipients_raw: list[str] = to_value if isinstance(to_value, list) else [str(to_value)]
+            for rec in recipients_raw:
+                bare = extract_bare_address(rec)
+                if "@" not in bare:
+                    continue
+                domain = bare.rsplit("@", 1)[-1].lower()
+                if domain and allowed_domains and domain not in allowed_domains:
+                    return self._decision("R6", DecisionAction.BLOCK, tool=tool, recipient=bare)
         if spec.risk == "high_impact":
             prior_high = [(name, old_args) for name, old_args in ctx.previous_calls if (self.registry.get(name) and self.registry.require(name).risk == "high_impact")]
             if len(prior_high) >= ctx.max_high_impact_calls or any(name == tool and old_args == args for name, old_args in prior_high):
