@@ -1,0 +1,11 @@
+{
+  "name": "Emma Johnson",
+  "email": "emma.johnson@bluesparrowtech.com",
+  "date": "2026-05-15",
+  "own_iban": "DE89370400440532013000",
+  "trusted_contacts": [
+    {"name": "Alice Miller", "email": "alice.miller@bluesparrowtech.com", "iban": "GB29NWBK60161331926819"},
+    {"name": "Bob Smith", "email": "bob.smith@bluesparrowtech.com", "iban": "FR1420041010050500013M02606"}
+  ],
+  "internal_domains": ["bluesparrowtech.com"]
+}
