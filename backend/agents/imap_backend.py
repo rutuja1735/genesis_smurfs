@@ -168,13 +168,19 @@ class ImapBackend:
         password: str | None = None,
         imap_port: int | None = None,
         smtp_port: int | None = None,
+        mode: str | None = None,
         body_max_chars: int | None = None,
         _imap_conn: Any = None,  # injected in tests
     ) -> None:
-        self._host = host or os.environ.get("IMAP_HOST", "")
-        self._smtp_host = smtp_host or os.environ.get("SMTP_HOST", self._host)
-        self._user = user or os.environ.get("EMAIL_USER", "")
-        self._password = password or os.environ.get("EMAIL_PASSWORD", "")
+        self.mode = (mode or os.environ.get("REAL_EMAIL_MODE", "readonly")).lower()
+        user_val = user or os.environ.get("EMAIL_USER", "")
+        pwd_val = password or os.environ.get("EMAIL_PASSWORD", "") or os.environ.get("APP_PASSWORD", "")
+        self._user = user_val.strip()
+        self._password = pwd_val.strip().replace(" ", "")
+        default_host = "imap.gmail.com" if self._user.endswith("@gmail.com") else ""
+        default_smtp = "smtp.gmail.com" if self._user.endswith("@gmail.com") else default_host
+        self._host = host or os.environ.get("IMAP_HOST", default_host)
+        self._smtp_host = smtp_host or os.environ.get("SMTP_HOST", default_smtp or self._host)
         self._imap_port = imap_port or int(os.environ.get("IMAP_PORT", "993"))
         self._smtp_port = smtp_port or int(os.environ.get("SMTP_PORT", "587"))
         self._body_max = body_max_chars if body_max_chars is not None else _DEFAULT_BODY_MAX
@@ -186,6 +192,20 @@ class ImapBackend:
             conn.login(self._user, self._password)
             self._imap = conn
         return self._imap  # type: ignore[return-value]
+
+    def get_inbox_stats(self) -> dict[str, int]:
+        """Fetch total and unread message counters in a single roundtrip."""
+        imap = self._get_imap()
+        _, data = imap.status("INBOX", "(MESSAGES UNSEEN)")
+        if data and data[0]:
+            raw = data[0].decode() if isinstance(data[0], bytes) else str(data[0])
+            msgs_match = re.search(r"MESSAGES\s+(\d+)", raw)
+            unseen_match = re.search(r"UNSEEN\s+(\d+)", raw)
+            return {
+                "total": int(msgs_match.group(1)) if msgs_match else 0,
+                "unread": int(unseen_match.group(1)) if unseen_match else 0,
+            }
+        return {"total": 0, "unread": 0}
 
     def list_messages(
         self,

@@ -114,4 +114,21 @@ python -m demo.cli --scenario attack
 python -m demo.scenarios
 ```
 
+## Email Agent REST API (Frontend Reference)
+
+The backend provides dedicated endpoints for building an interactive email agent UI:
+
+- `GET /api/email/status`: Returns current operating configuration (`real` vs `mock`, `readonly`/`draft_only`/`full`, `dry_run`, `send_allowlist`), OAuth/IMAP auth status, and inbox counters (`unread`, `total`).
+- `POST /api/email/config`: Live runtime configuration updater for frontend demo controls (`email_agent`, `mode`, `dry_run`, `send_allowlist`).
+- `GET /api/email/inbox`: Lists mailbox emails (supports `unread_only=true`, `limit=25`, and search query `query=...`).
+- `GET /api/email/messages/{email_id}`: Retrieves full normalized email payload.
+- `POST /api/email/messages/{email_id}/read`: Marks an email as read.
+- `DELETE /api/email/messages/{email_id}`: Trashes/deletes an email (respects mode and dry-run).
+- `POST /api/email/draft`: Creates a draft email (`to`, `subject`, `body`).
+- `POST /api/email/send`: Sends an email or simulates in dry-run mode (enforces recipient allowlist, live cap, and audit ledger).
+- `GET /api/email/actions`: Retrieves all write operations logged to the `ActionLedger`.
+- `DELETE /api/email/actions`: Clears the action ledger.
+- `POST /api/email/run`: Executes a prompt specifically targeting the email agent through the complete security defense pipeline (`SecurityGate`, `Planner`, `Executor`, provenance and scanners).
+
 The API is a local demo service, not a production deployment: it has no authentication, operational hardening, or multi-user isolation.
+

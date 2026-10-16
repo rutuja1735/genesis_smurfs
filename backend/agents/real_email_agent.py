@@ -121,6 +121,12 @@ class ActionLedger:
     def entries(self) -> list[dict[str, Any]]:
         return list(self._entries)
 
+    def clear(self) -> None:
+        """Clear recorded entries in memory and on disk."""
+        self._entries.clear()
+        if self._path and self._path.exists():
+            self._path.write_text("", encoding="utf-8")
+
 
 # ---------------------------------------------------------------------------
 # RealEmailAgent
@@ -159,6 +165,47 @@ class RealEmailAgent:
         self._backend = backend
         default_ledger_path = Path("backend/logs/real_email_actions.jsonl")
         self._ledger = ActionLedger(ledger_path or default_ledger_path)
+
+    @property
+    def backend(self) -> MailBackend:
+        return self._backend
+
+    @property
+    def dry_run(self) -> bool:
+        return self._dry_run
+
+    @dry_run.setter
+    def dry_run(self, value: bool) -> None:
+        self._dry_run = bool(value)
+
+    @property
+    def allowlist(self) -> list[str]:
+        return list(self._allowlist)
+
+    @allowlist.setter
+    def allowlist(self, value: list[str]) -> None:
+        self._allowlist = [a.strip().lower() for a in value if a.strip()]
+
+    @property
+    def ledger(self) -> ActionLedger:
+        return self._ledger
+
+    @property
+    def state(self) -> dict[str, Any]:
+        return {
+            "backend": type(self._backend).__name__,
+            "mode": getattr(self._backend, "mode", os.environ.get("REAL_EMAIL_MODE", "readonly")),
+            "dry_run": self._dry_run,
+            "actions": self._ledger.entries,
+        }
+
+    @state.setter
+    def state(self, value: dict[str, Any]) -> None:
+        pass
+
+    def snapshot(self) -> dict[str, Any]:
+        import copy
+        return copy.deepcopy(self.state)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -400,7 +447,16 @@ def create_email_agent(
 
     if backend is None:
         email_mode = os.environ.get("REAL_EMAIL_MODE", "readonly")
-        from .gmail_backend import GmailBackend
-        backend = GmailBackend(mode=email_mode)
+        email_backend_type = os.environ.get("EMAIL_BACKEND", "").lower()
+        has_imap_creds = bool(os.environ.get("EMAIL_USER") and (os.environ.get("EMAIL_PASSWORD") or os.environ.get("APP_PASSWORD")))
+        creds_path = Path(os.environ.get("GMAIL_CREDENTIALS_PATH", "backend/.secrets/credentials.json"))
+        token_path = Path(os.environ.get("GMAIL_TOKEN_PATH", "backend/.secrets/gmail_token.json"))
+
+        if email_backend_type == "imap" or (not email_backend_type and has_imap_creds and not (creds_path.exists() or token_path.exists())):
+            from .imap_backend import ImapBackend
+            backend = ImapBackend(mode=email_mode)
+        else:
+            from .gmail_backend import GmailBackend
+            backend = GmailBackend(mode=email_mode)
 
     return RealEmailAgent(backend=backend)

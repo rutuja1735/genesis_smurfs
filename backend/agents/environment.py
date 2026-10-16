@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,7 @@ from .slack import SlackAgent
 @dataclass
 class MockEnvironment:
     profile: dict[str, Any]
-    email: EmailAgent
+    email: Any  # EmailAgent | RealEmailAgent
     slack: SlackAgent
     banking: BankingAgent
     registry: ToolRegistry
@@ -27,12 +28,29 @@ class MockEnvironment:
 
 
 def create_mock_environment(*, data_dir: str | None = None,
-                            injections: dict[str, str] | None = None) -> MockEnvironment:
+                            injections: dict[str, str] | None = None,
+                            email_agent_type: str | None = None,
+                            email_backend: Any = None) -> MockEnvironment:
     kwargs = {"data_dir": data_dir, "injections": injections or {}}
-    email, slack, banking = EmailAgent(**kwargs), SlackAgent(**kwargs), BankingAgent(**kwargs)
     root = Path(data_dir) if data_dir else Path(__file__).resolve().parent.parent / "data"
     with (root / "user_profile.json").open(encoding="utf-8") as handle:
         profile = json.load(handle)
+
+    use_real = (email_agent_type == "real") or (
+        email_agent_type is None and os.environ.get("EMAIL_AGENT", "").lower() == "real" and not injections
+    )
+    if use_real:
+        from .real_email_agent import create_email_agent
+        try:
+            email = create_email_agent(backend=email_backend)
+        except Exception:
+            if email_agent_type == "real":
+                raise
+            email = EmailAgent(**kwargs)
+    else:
+        email = EmailAgent(**kwargs)
+
+    slack, banking = SlackAgent(**kwargs), BankingAgent(**kwargs)
     registry = ToolRegistry([*email.specs(), *slack.specs(), *banking.specs()])
     return MockEnvironment(profile, email, slack, banking, registry)
 

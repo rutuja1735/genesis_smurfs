@@ -12,8 +12,11 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
+
+load_dotenv()
 
 from agents import create_mock_environment
 from attacks import ATTACKS, GOALS
@@ -21,6 +24,7 @@ from core.events import EventBus
 from core.llm import OpenRouterClient, OpenRouterConfig
 from core.logstore import LogStore
 from tasks import TASKS, tasks_for_suite
+from .email_routes import router as email_router
 from .jobs import execute_run
 from .schemas import ConversationCreate, ConversationMessage, EvalCreate, RunCreate
 
@@ -45,9 +49,10 @@ def create_app(*, store: LogStore | None = None, logs_dir: str | Path | None = N
         conversation = db.get_conversation(conversation_id) if conversation_id else None
         run_record = {"run_id": run_id, **spec.model_dump(), "conversation_id": conversation_id, "eval_id": eval_id,
                       "session_state": conversation.get("data_state", {}) if conversation else {}}
+        is_real = spec.email_agent == "real" or (spec.email_agent is None and os.environ.get("EMAIL_AGENT", "").lower() == "real")
         db.create_run(run_id, spec.command, defense=spec.defense, attack=spec.attack,
                       injection_goal=spec.injection_goal, confirm_policy=spec.confirm_policy,
-                      status="pending", conversation_id=conversation_id, track="mock", eval_id=eval_id,
+                      status="pending", conversation_id=conversation_id, track="real" if is_real else "mock", eval_id=eval_id,
                       jsonl_path=str(root / "runs" / f"{run_id}.jsonl"))
         async def worker() -> None:
             try:
@@ -60,6 +65,9 @@ def create_app(*, store: LogStore | None = None, logs_dir: str | Path | None = N
                 pass  # RUN_ERROR and status are already persisted by execute_run.
         asyncio.create_task(worker())
         return run_id
+
+    app.state.start_run = start_run
+    app.include_router(email_router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -105,7 +113,7 @@ def create_app(*, store: LogStore | None = None, logs_dir: str | Path | None = N
         runs = [await start_run(RunCreate(command=command, agents=body.agents, defense=defense,
                                           attack=body.attack, injection_goal=body.injection_goal,
                                           confirm_policy=body.confirm_policy, neutralize=body.neutralize,
-                                          output_filter=body.output_filter), conversation_id)
+                                          output_filter=body.output_filter, email_agent=body.email_agent), conversation_id)
                 for defense in (["ours", "none"] if body.compare else [body.defense])]
         # Expose the message field as content in the response while keeping the
         # shared run schema's command property in storage and worker execution.

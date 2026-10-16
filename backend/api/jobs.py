@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -36,11 +37,15 @@ def execute_run(run: dict[str, Any], *, store: Any, event_bus: Any, llm_factory:
     audit = AuditLogger(logs_dir / "runs" / f"{run_id}.jsonl", run_id,
                         store=store, event_bus=event_bus)
     store.update_run(run_id, status="running")
+    track = "real" if (run.get("email_agent") == "real" or run.get("track") == "real" or (os.environ.get("EMAIL_AGENT", "").lower() == "real" and not run.get("attack"))) else "mock"
     audit.write("RUN_START", command=run["command"], defense=run["defense"], attack=run.get("attack"),
-                injection_goal=run.get("injection_goal"), track="mock")
+                injection_goal=run.get("injection_goal"), track=track)
     try:
         injection_values = injections_for(run.get("attack"), run.get("injection_goal"))
-        env = create_mock_environment(injections=injection_values if not run.get("session_state") else None)
+        env = create_mock_environment(
+            injections=injection_values if not run.get("session_state") else None,
+            email_agent_type=run.get("email_agent"),
+        )
         selected_agents = set(run.get("agents") or ["email", "slack", "banking"])
         unknown_agents = selected_agents - {"email", "slack", "banking"}
         if unknown_agents:

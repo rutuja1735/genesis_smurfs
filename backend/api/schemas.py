@@ -19,6 +19,7 @@ class RunCreate(BaseModel):
     confirm_policy: Literal["deny", "approve_delegated"] = "deny"
     neutralize: Literal["off", "annotate", "redact"] = "redact"
     output_filter: bool = True
+    email_agent: Literal["mock", "real"] | None = None
 
 
 class ConversationMessage(BaseModel):
@@ -31,6 +32,7 @@ class ConversationMessage(BaseModel):
     neutralize: Literal["off", "annotate", "redact"] = "redact"
     output_filter: bool = True
     compare: bool = False
+    email_agent: Literal["mock", "real"] | None = None
 
 
 class EvalCreate(BaseModel):
@@ -45,3 +47,35 @@ class EvalCreate(BaseModel):
     batch_size: int = Field(default=5, ge=1, le=5)
     cursor: int | None = Field(default=None, ge=0)
     confirm_cost: bool = False
+
+
+class EmailConfigUpdate(BaseModel):
+    email_agent: Literal["mock", "real"] | None = None
+    mode: Literal["readonly", "draft", "draft_only", "full"] | None = None
+    dry_run: bool | None = None
+    send_allowlist: list[str] | None = None
+
+
+class EmailDraftRequest(BaseModel):
+    to: list[str] = Field(min_length=1)
+    subject: str = Field(default="")
+    body: str = Field(default="")
+    agent: Literal["mock", "real"] | None = None
+
+
+class EmailSendRequest(BaseModel):
+    to: list[str] = Field(min_length=1)
+    subject: str = Field(default="")
+    body: str = Field(default="")
+    cc: list[str] = Field(default_factory=list)
+    agent: Literal["mock", "real"] | None = None
+
+
+class EmailRunRequest(BaseModel):
+    command: str = Field(min_length=1, max_length=12000)
+    email_agent: Literal["mock", "real"] = "real"
+    defense: Literal["ours", "none", "spotlighting"] = "ours"
+    confirm_policy: Literal["deny", "approve_delegated"] = "deny"
+    neutralize: Literal["off", "annotate", "redact"] = "redact"
+    output_filter: bool = True
+
