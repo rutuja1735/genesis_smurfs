@@ -1,0 +1,31 @@
+# Python virtual environment
+backend/.venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Egg info
+*.egg-info/
+dist/
+build/
+
+# Pytest cache
+.pytest_cache/
+
+# Environment files - NEVER commit these, they contain secrets
+.env
+*.env
+.env.*
+
+# Logs
+*.log
+backend/logs/*.db
+
+# IDE
+.vscode/
+.idea/

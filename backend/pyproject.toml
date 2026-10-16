@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentgaurd-phases-01-04"
+version = "0.1.0"
+description = "agentgaurd plan-first defense core, OpenRouter client, and JSON mock agents"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.7,<3",
+  "networkx>=3.0,<4",
+  "openai>=1.30,<3",
+  "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "pytest-cov>=5,<7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "demo*", "agents*", "data*"]
+
+[tool.setuptools.package-data]
+data = ["*.json"]
