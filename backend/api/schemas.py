@@ -78,4 +78,3 @@ class EmailRunRequest(BaseModel):
     confirm_policy: Literal["deny", "approve_delegated"] = "deny"
     neutralize: Literal["off", "annotate", "redact"] = "redact"
     output_filter: bool = True
-

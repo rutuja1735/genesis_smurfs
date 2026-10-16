@@ -47,6 +47,7 @@ class FakeLLM:
             "resolver": '{"resolved_args":{}}',
             "expander": '{"new_tool_calls":[]}',
             "reflection": '{"args":{}}',
+            "injection_classifier": '{"detections":[]}',
             "final_answer": "I could not find any relevant information.",
         }
         self.prompts: list[PromptRecord] = []

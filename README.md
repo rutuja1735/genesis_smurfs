@@ -11,7 +11,7 @@ Agentgaurd is a Python backend that plans tool use before execution, applies det
 - Phase 08: optional AgentDojo Track B adapter with fail-closed risk mapping, sink metadata, profile configuration, capped pair batching, and a subprocess entry point. AgentDojo is not required by the main environment.
 - Phase 09: FastAPI endpoints for conversations, messages, runs, SSE event streaming, decisions, statistics, evaluation batches, mock data, and configuration; JSONL audit logs indexed in SQLite; log reindexing.
 
-The Next.js user interface is Phase 10 and is not included.
+A local agent workspace frontend is included in `frontend/` and is served at the API root.
 
 ## Install and test
 
@@ -52,6 +52,26 @@ curl -X POST http://127.0.0.1:8000/api/runs \
 ```
 
 The run response contains a `run_id`. Subscribe to `/api/runs/{run_id}/stream` for SSE audit events, or inspect `/api/runs/{run_id}`, `/api/runs/{run_id}/events`, and `/api/decisions?decision=BLOCK`.
+
+## Test with a malicious email
+
+`backend/data/email.malicious.json` contains two ordinary emails and one clearly malicious test email. The clean benchmark fixture at `backend/data/email.json` is unchanged. To run the malicious message through the local API, back up the clean file, temporarily use the malicious fixture, start the API, and submit a request to summarize unread email:
+
+```powershell
+cd backend
+Copy-Item .\data\email.json .\data\email.clean.backup.json
+Copy-Item .\data\email.malicious.json .\data\email.json -Force
+uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+In another PowerShell window, submit `Summarize my unread emails` from the API docs at `http://127.0.0.1:8000/docs` (`POST /api/runs`, with `{"command":"Summarize my unread emails","defense":"ours"}`). Inspect the run's events at `GET /api/runs/{run_id}/events` for `INJECTION_SUSPECTED` and `INJECTION_NEUTRALIZED`. Restore the clean fixture after the test:
+
+```powershell
+Copy-Item .\data\email.clean.backup.json .\data\email.json -Force
+Remove-Item .\data\email.clean.backup.json
+```
+
+You can verify the fixture's scanner and redaction behavior without an API key by running `python -m pytest tests/test_malicious_email_fixture.py` from `backend/`.
 
 ## Run the Phase 7 evaluator
 
@@ -100,6 +120,7 @@ The API also provides `POST /api/reindex`. API keys and prompt contents are not 
 
 - Tool outputs remain untrusted data. The plan and deterministic gate control tool authority; the scanner and content neutralizer are additional defenses.
 - The scanner is heuristic and can miss novel attacks or flag benign text. Deterministic provenance and gate checks are the primary action controls.
+- Tool-output injection scanning combines known-pattern signatures with a semantic classifier call through the configured OpenRouter model for untrusted text that the signatures did not match. Classifier decisions are logged separately; they never authorize actions. Evaluator output reports injection detection separately from attack success, blocks, utility, and actual redactions. This adds model calls and cost when tool outputs contain text.
 - If a user delegates a sensitive value to an attacker-controlled document without a trusted cross-check, the system may require confirmation or block the action.
 - The planner can misunderstand a legitimate request. The graph validator and policy checks reduce, but cannot eliminate, that risk.
 - The output filter checks for known grounding and exfiltration issues; it cannot prove that source documents are truthful.
@@ -112,6 +133,25 @@ cd backend
 python -m pytest
 python -m demo.cli --scenario attack
 python -m demo.scenarios
+```
+
+## Agent workspace frontend
+
+Open http://localhost:8000/ after starting the API. The frontend opens directly to
+Overview with no login or landing page. It is served by FastAPI from `frontend/`,
+so no separate Node server or frontend build is required.
+
+The workspace includes agent runs with live SSE execution events, analytics,
+Email/Slack/Banking agent tasks and mock data, injection scenarios, evaluation
+batches, audit decisions, JSON exports, and browser-local execution preferences.
+The interface uses the existing REST API. OpenRouter credentials stay in the
+backend environment. Agent data is mock data, not live connected accounts.
+
+For the Python environment prepared in this workspace:
+
+```powershell
+cd backend
+.\.venv312\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
 
 ## Email Agent REST API (Frontend Reference)
@@ -131,4 +171,3 @@ The backend provides dedicated endpoints for building an interactive email agent
 - `POST /api/email/run`: Executes a prompt specifically targeting the email agent through the complete security defense pipeline (`SecurityGate`, `Planner`, `Executor`, provenance and scanners).
 
 The API is a local demo service, not a production deployment: it has no authentication, operational hardening, or multi-user isolation.
-

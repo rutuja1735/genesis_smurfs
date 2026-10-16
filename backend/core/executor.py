@@ -13,6 +13,7 @@ from .expander import Expander
 from .final_answer import FinalAnswer, FinalAnswerResult
 from .gate import Decision, DecisionAction, GateContext, PolicyGate
 from .graph import PlanGraph, PlanNode, build_dag
+from .injection_classifier import InjectionClassifier
 from .neutralizer import sanitize
 from .output_filter import OutputFilterContext
 from .provenance import Origin, Provenance
@@ -33,6 +34,7 @@ class ExecutionState:
     node_status: dict[str, str] = field(default_factory=dict)
     decisions: list[Decision] = field(default_factory=list)
     neutralizer_events: list[dict[str, Any]] = field(default_factory=list)
+    injection_detections: list[dict[str, Any]] = field(default_factory=list)
     executed_calls: list[str] = field(default_factory=list)
     attempted_calls: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
     action_completed: bool = False
@@ -51,6 +53,7 @@ class ExecutionResult:
     final: FinalAnswerResult
     neutralizer_events: tuple[dict[str, Any], ...] = ()
     executed_calls: tuple[str, ...] = ()
+    injection_detections: tuple[dict[str, Any], ...] = ()
 
 
 class Executor:
@@ -65,6 +68,7 @@ class Executor:
         self.confirm_policy = confirm_policy
         self.gate = PolicyGate(registry)
         self.resolver = Resolver(llm)
+        self.injection_classifier = InjectionClassifier(llm)
         self.expander = Expander(llm, registry, max_nodes=max_nodes, max_rounds=max_expansion_rounds)
         self.final_answer = FinalAnswer(llm, audit=audit, output_filter_enabled=output_filter_enabled)
         self._state: ExecutionState | None = None
@@ -84,7 +88,7 @@ class Executor:
             self.audit.write("RUN_END", node_status=state.node_status, executed=len(state.executed_calls), blocked=sum(d.action == DecisionAction.BLOCK for d in state.decisions), final_answer_hash=final.raw_answer_hash)
         return ExecutionResult(state.plan, state.raw_outputs, state.sanitized_views, state.node_status,
                                tuple(state.decisions), final, tuple(state.neutralizer_events),
-                               tuple(state.executed_calls))
+                               tuple(state.executed_calls), tuple(state.injection_detections))
 
     def _run_node(self, node: PlanNode, *, source: str) -> None:
         state = self._require_state()
@@ -322,17 +326,59 @@ class Executor:
             # The audit retains raw output, with secrets masked by the writer.
             self.audit.write("TOOL_OUTPUT", node=node.id, raw_output=raw_output)
         scan_fields: set[str] = {"iban", "email", "url", "amount", "id", "identifier", "address", "recipient"}
-        view = sanitize(raw_output, self.neutralize_mode, sink_fields=scan_fields)
+        classifier_stats: dict[str, Any] = {"attempted": False, "candidate_fields": 0, "raw_detections": 0, "error": None}
+
+        def classify(fields: dict[str, str]) -> list[dict[str, object]]:
+            classifier_stats.update(attempted=True, candidate_fields=len(fields))
+            try:
+                detections = self.injection_classifier.classify(fields)
+                classifier_stats["raw_detections"] = len(detections)
+                return detections
+            except Exception as exc:
+                classifier_stats["error"] = f"{type(exc).__name__}: {exc}"
+                if self.audit:
+                    self.audit.write("INJECTION_CLASSIFIER_ERROR", node=node.id, error=classifier_stats["error"])
+                return []
+
+        scans = scan_output(raw_output, semantic_classifier=classify)
+        if self.audit:
+            self.audit.write("INJECTION_CLASSIFIER_RESULT", node=node.id,
+                             status="error" if classifier_stats["error"] else ("completed" if classifier_stats["attempted"] else "skipped_known_signature_or_no_text"),
+                             candidate_fields=classifier_stats["candidate_fields"],
+                             detections=sum(match.source == "semantic_llm" for result in scans.values() for match in result.matches))
+        view = sanitize(raw_output, self.neutralize_mode, sink_fields=scan_fields, scan_results=scans)
         state.sanitized_views[node.id] = view.value
         state.neutralizer_events.extend({"node": node.id, **event} for event in view.events)
-        scans = scan_output(raw_output)
-        scan_count = view.spans
         if self.audit:
             for field_name, result in scans.items():
-                self.audit.write("INJECTION_SUSPECTED", node=node.id, field=field_name, severity=result.severity, matched=[match.matched for match in result.matches], excerpt=result.matches[0].excerpt if result.matches else "")
+                for match in result.matches:
+                    state.injection_detections.append({
+                        "node": node.id, "field": field_name, "severity": match.severity,
+                        "source": match.source, "confidence": match.confidence,
+                        "matched": match.matched, "reason": match.reason,
+                    })
+                self.audit.write("INJECTION_SUSPECTED", node=node.id, field=field_name,
+                                 severity=result.severity,
+                                 detections=[{"matched": match.matched, "source": match.source,
+                                              "confidence": match.confidence, "reason": match.reason}
+                                             for match in result.matches],
+                                 matched=[match.matched for match in result.matches],
+                                 excerpt=result.matches[0].excerpt if result.matches else "")
+        else:
+            for field_name, result in scans.items():
+                for match in result.matches:
+                    state.injection_detections.append({
+                        "node": node.id, "field": field_name, "severity": match.severity,
+                        "source": match.source, "confidence": match.confidence,
+                        "matched": match.matched, "reason": match.reason,
+                    })
         for event in view.events:
             if self.audit:
-                self.audit.write("INJECTION_NEUTRALIZED", node=node.id, field=event.get("field"), mode=view.mode, severity=event.get("severity"), excerpt=event.get("excerpt"), spans=scan_count)
+                self.audit.write("INJECTION_NEUTRALIZED", node=node.id,
+                                 field=event.get("field"), mode=view.mode,
+                                 action=event.get("action"), severity=event.get("severity"),
+                                 source=event.get("source"), confidence=event.get("confidence"),
+                                 excerpt=event.get("excerpt"), spans=int(event.get("action") == "redacted"))
         # Hidden-text signal: if an email tool stripped hidden HTML blocks,
         # emit a medium-severity injection suspected event (Section 6 requirement).
         hidden_count = 0
@@ -352,7 +398,6 @@ class Executor:
                 matched=["hidden_text_removed"],
                 excerpt=hidden_signal.matches[0].excerpt if hidden_signal.matches else "",
             )
-
 
     def _record_gate(self, decision: Decision, node: PlanNode, **fields: Any) -> None:
         if self.audit:

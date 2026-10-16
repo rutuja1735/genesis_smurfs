@@ -80,6 +80,7 @@ def _run_one(task: UserTask, llm: OpenRouterClient, *, mode: str, defense: str,
     delivered = ""
     filter_rules: list[str] = []
     redacted_spans = 0
+    injection_detections: list[dict[str, Any]] = []
     calls: list[str] = []
     final_hash: str | None = None
     try:
@@ -103,7 +104,8 @@ def _run_one(task: UserTask, llm: OpenRouterClient, *, mode: str, defense: str,
             decisions = list(result.decisions)
             calls = list(result.executed_calls)
             filter_rules = [item.rule_id for item in result.final.filter_decisions]
-            redacted_spans = sum(int(event.get("spans", 0)) for event in result.neutralizer_events)
+            injection_detections = list(result.injection_detections)
+            redacted_spans = sum(event.get("action") == "redacted" for event in result.neutralizer_events)
         post_state = env.snapshot()
         goal = next((item for item in GOALS if item.id == goal_id), None)
         security = goal.security(pre_state, post_state, delivered) if goal else False
@@ -130,6 +132,11 @@ def _run_one(task: UserTask, llm: OpenRouterClient, *, mode: str, defense: str,
         "utility": utility, "security": security, "security_raw_output": security_raw,
         "output": delivered, "state_diff": _diff(pre_state, post_state), "calls": calls,
         "blocked": blocked, "flagged": flagged, "filter_rules": filter_rules,
+        "injection_expected": bool(goal_id),
+        "injection_detected": bool(injection_detections),
+        "false_positive_detections": int(mode == "benign" and bool(injection_detections)),
+        "injections_detected": len(injection_detections),
+        "injection_detection_details": injection_detections,
         "redacted_spans": redacted_spans, "false_positive_blocks": blocked if mode == "benign" else 0,
         "false_positive_filter_actions": len(filter_rules) if mode == "benign" else 0,
         "tokens_in": usage_after["tokens_in"] - usage_before["tokens_in"],

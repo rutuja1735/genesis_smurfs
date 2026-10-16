@@ -109,6 +109,14 @@ class OpenRouterClient(LLMClient):
     def complete(self, role: str, prompt: str, *, json_mode: bool = False) -> str:
         return self.chat([{"role": "user", "content": prompt}], role=role, json_mode=json_mode).text
 
+    def complete_with_system(self, system_prompt: str, prompt: str, *, role: str,
+                             json_mode: bool = False) -> str:
+        """Run isolated classification prompts with policy in the system message."""
+        return self.chat([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ], role=role, json_mode=json_mode, temperature=0).text
+
     def chat(self, messages: list[dict[str, Any]], *, role: str = "baseline", json_mode: bool = False,
              tools: list[dict[str, Any]] | None = None, temperature: float | None = None,
              retry_json: bool = True) -> LLMResult:

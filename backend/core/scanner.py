@@ -6,6 +6,7 @@ import base64
 import re
 import unicodedata
 from dataclasses import dataclass
+from typing import Callable
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,9 @@ class ScanMatch:
     start: int
     end: int
     excerpt: str
+    source: str = "pattern"
+    confidence: float = 1.0
+    reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -55,9 +59,9 @@ def scan_text(text: str) -> ScanResult:
         for match in re.finditer(pattern, normalized, re.IGNORECASE):
             start = offsets[match.start()] if match.start() < len(offsets) else 0
             end = offsets[match.end() - 1] + 1 if match.end() and match.end() - 1 < len(offsets) else len(text)
-            matches.append(ScanMatch(severity, match.group(0), start, end, text[max(0, start - 60):min(len(text), end + 60)]))
+            matches.append(ScanMatch(severity, match.group(0), start, end, text[max(0, start - 60):min(len(text), end + 60)], "pattern", 1.0, "Matched a known injection signature."))
     for match in _ZERO_WIDTH.finditer(text):
-        matches.append(ScanMatch("high", "zero_width_or_bidi_control", match.start(), match.end(), text[max(0, match.start() - 60):min(len(text), match.end() + 60)]))
+        matches.append(ScanMatch("high", "zero_width_or_bidi_control", match.start(), match.end(), text[max(0, match.start() - 60):min(len(text), match.end() + 60)], "pattern", 1.0, "Found a zero-width or bidirectional control character."))
     # Prefer stronger classification for overlapping/duplicate spans.
     levels = {"low": 1, "med": 2, "high": 3}
     matches.sort(key=lambda item: (item.start, -levels[item.severity], item.end))
@@ -72,8 +76,9 @@ def scan_text(text: str) -> ScanResult:
     return ScanResult(overall, tuple(dedup))
 
 
-def scan_output(output: object) -> dict[str, ScanResult]:
+def scan_output(output: object, semantic_classifier: Callable[[dict[str, str]], list[dict[str, object]]] | None = None) -> dict[str, ScanResult]:
     found: dict[str, ScanResult] = {}
+    candidates: dict[str, str] = {}
 
     def visit(value: object, path: str = "") -> None:
         if isinstance(value, dict):
@@ -86,8 +91,31 @@ def scan_output(output: object) -> dict[str, ScanResult]:
             result = scan_text(value)
             if result.matches:
                 found[path] = result
+            elif value.strip():
+                candidates[path] = value
 
     visit(output)
+    if semantic_classifier and candidates:
+        for item in semantic_classifier(candidates):
+            path = item.get("field")
+            span = item.get("span")
+            confidence = item.get("confidence")
+            if not isinstance(path, str) or path not in candidates or not isinstance(span, str) or not span.strip():
+                continue
+            if not isinstance(confidence, (float, int)) or isinstance(confidence, bool) or confidence < 0.7:
+                continue
+            source_text = candidates[path]
+            start = source_text.find(span)
+            if start < 0:
+                continue
+            end = start + len(span)
+            severity = "high" if item.get("severity") == "high" else "med"
+            category = str(item.get("category", "instruction_in_untrusted_content"))[:80]
+            reason = str(item.get("reason", "Semantic classifier identified an instruction in untrusted content."))[:300]
+            match = ScanMatch(severity, span, start, end,
+                              source_text[max(0, start - 60):min(len(source_text), end + 60)],
+                              "semantic_llm", float(confidence), f"{category}: {reason}")
+            found[path] = ScanResult(severity, (match,))
     return found
 
 

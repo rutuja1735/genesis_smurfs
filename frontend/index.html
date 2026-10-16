@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f8">
+  <meta name="description" content="Agentgaurd agent workspace. Run, observe, and evaluate your agents.">
+  <title>Agentgaurd · Workspace</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true"></span>Agentgaurd</a>
+    <a class="workspace-link" href="#overview" id="workspace-link"></a>
+    <div class="nav-label">WORKSPACE</div><nav id="navigation" aria-label="Main navigation"></nav>
+    <div class="sidebar-bottom"><div class="environment"><span class="status-dot"></span>Local workspace<span class="mini-badge">DEV</span></div><a class="profile" href="#settings"><span class="avatar">AG</span><span><strong>Agentgaurd</strong><small>Your agent workspace</small></span><span id="profile-icon"></span></a></div>
+  </aside>
+  <div class="mobile-bar"><button class="icon-button" id="menu-toggle" aria-label="Toggle navigation"></button><a class="brand" href="#overview"><span class="brand-mark"></span>Agentgaurd</a></div>
+  <main id="main" tabindex="-1"><div class="loading">Connecting to your workspace…</div></main>
+  <dialog id="dialog"><form id="dialog-form"><div id="dialog-content"></div></form></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

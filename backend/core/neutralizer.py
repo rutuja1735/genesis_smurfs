@@ -21,20 +21,22 @@ class SanitizedView:
     spans: int
     mode: str
     events: tuple[dict[str, Any], ...]
+    redacted_spans: int = 0
 
 
 def _intersects(start: int, end: int, protected: list[tuple[int, int]]) -> bool:
     return any(start < right and end > left for left, right in protected)
 
 
-def sanitize_text(text: str, mode: Mode = "redact", requested_values: list[str] | None = None, sink_field: bool = False) -> tuple[str, ScanResult, list[dict[str, Any]]]:
+def sanitize_text(text: str, mode: Mode = "redact", requested_values: list[str] | None = None,
+                  sink_field: bool = False, scan_result: ScanResult | None = None) -> tuple[str, ScanResult, list[dict[str, Any]]]:
     raw = text
     normalized = unicodedata.normalize("NFKC", _ZERO_WIDTH.sub("", text))
-    scan = scan_text(raw)
+    scan = scan_result or scan_text(raw)
     if mode == "off":
         return normalized, scan, []
     if sink_field:
-        return normalized, scan, [{"kind": "annotated_protected_sink_field", "severity": m.severity, "excerpt": m.excerpt} for m in scan.matches]
+        return normalized, scan, [{"kind": "annotated_protected_sink_field", "action": "annotated", "severity": m.severity, "excerpt": m.excerpt, "span": m.matched, "start": m.start, "end": m.end, "source": m.source, "confidence": m.confidence, "reason": m.reason} for m in scan.matches]
     protected = [(m.start(), m.end()) for m in _PROTECTED.finditer(raw)]
     for value in requested_values or []:
         if value:
@@ -49,13 +51,13 @@ def sanitize_text(text: str, mode: Mode = "redact", requested_values: list[str] 
         start, end = item.start, item.end
         if _intersects(start, end, protected):
             chunks.extend((raw[cursor:start], f'<suspected_injection severity="{item.severity}">{raw[start:end]}</suspected_injection>'))
-            events.append({"kind": "annotated_protected_value", "severity": item.severity, "excerpt": item.excerpt})
+            events.append({"kind": "annotated_protected_value", "action": "annotated", "severity": item.severity, "excerpt": item.excerpt, "span": raw[start:end], "start": start, "end": end, "source": item.source, "confidence": item.confidence, "reason": item.reason})
         elif item.severity == "high" and mode == "redact":
             chunks.extend((raw[cursor:start], f"[REDACTED: suspected injected instruction #{index}, see security notes]"))
-            events.append({"kind": "redacted", "severity": item.severity, "excerpt": item.excerpt})
+            events.append({"kind": "redacted", "action": "redacted", "severity": item.severity, "excerpt": item.excerpt, "span": raw[start:end], "start": start, "end": end, "source": item.source, "confidence": item.confidence, "reason": item.reason})
         elif item.severity in {"high", "med"}:
             chunks.extend((raw[cursor:start], f'<suspected_injection severity="{item.severity}">{raw[start:end]}</suspected_injection>'))
-            events.append({"kind": "annotated", "severity": item.severity, "excerpt": item.excerpt})
+            events.append({"kind": "annotated", "action": "annotated", "severity": item.severity, "excerpt": item.excerpt, "span": raw[start:end], "start": start, "end": end, "source": item.source, "confidence": item.confidence, "reason": item.reason})
         else:
             continue
         cursor = end
@@ -68,15 +70,18 @@ def sanitize_text(text: str, mode: Mode = "redact", requested_values: list[str] 
     return result, scan, events
 
 
-def sanitize(output: Any, mode: Mode = "redact", requested_values: list[str] | None = None, sink_fields: set[str] | None = None) -> SanitizedView:
+def sanitize(output: Any, mode: Mode = "redact", requested_values: list[str] | None = None,
+             sink_fields: set[str] | None = None,
+             scan_results: dict[str, ScanResult] | None = None) -> SanitizedView:
     if mode not in {"off", "annotate", "redact"}:
         raise ValueError("mode must be off, annotate, or redact")
     copied = copy.deepcopy(output)
     events: list[dict[str, Any]] = []
     count = 0
+    redacted_count = 0
 
     def visit(value: Any, path: str = "") -> Any:
-        nonlocal count
+        nonlocal count, redacted_count
         if isinstance(value, dict):
             return {key: visit(child, f"{path}.{key}" if path else str(key)) for key, child in value.items()}
         if isinstance(value, list):
@@ -84,12 +89,14 @@ def sanitize(output: Any, mode: Mode = "redact", requested_values: list[str] | N
         if isinstance(value, str):
             leaf = path.rsplit(".", 1)[-1]
             is_sink = leaf in (sink_fields or set())
-            result, scan_result, local_events = sanitize_text(value, mode, requested_values, is_sink)
+            result, scan_result, local_events = sanitize_text(value, mode, requested_values, is_sink,
+                                                              (scan_results or {}).get(path))
             count += len(scan_result.matches)
+            redacted_count += sum(event.get("action") == "redacted" for event in local_events)
             for event in local_events:
                 events.append({"field": path, **event})
             return result
         return value
 
     sanitized = visit(copied)
-    return SanitizedView(sanitized, count, mode, tuple(events))
+    return SanitizedView(sanitized, count, mode, tuple(events), redacted_count)

@@ -15,6 +15,7 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
@@ -341,6 +342,17 @@ def create_app(*, store: LogStore | None = None, logs_dir: str | Path | None = N
         with db._connect() as conn:
             runs = conn.execute("SELECT run_id FROM runs WHERE eval_id=? ORDER BY created_at", (eval_id,)).fetchall()
         return [db.get_run(row[0]) for row in runs]
+
+    # Serve the local workspace and API together so the browser needs no CORS
+    # configuration and the model credentials remain exclusively on the backend.
+    frontend = Path(__file__).resolve().parents[2] / "frontend"
+    if frontend.is_dir():
+        app.mount("/assets", StaticFiles(directory=frontend), name="frontend-assets")
+
+        @app.get("/", include_in_schema=False)
+        def workspace():
+            from fastapi.responses import FileResponse
+            return FileResponse(frontend / "index.html")
 
     return app
 
