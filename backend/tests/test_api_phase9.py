@@ -1,11 +1,26 @@
 import time
 import json
+import pytest
 
 from fastapi.testclient import TestClient
 
 from api.main import create_app
 from core.logstore import LogStore
 from core.types import FakeLLM
+
+
+@pytest.fixture(autouse=True)
+def isolate_gateway_configuration(monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_SECRET", "")
+
+
+def test_gateway_rejects_direct_api_and_accepts_authenticated_proxy(tmp_path, monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_SECRET", "test-only-gateway-secret")
+    app = create_app(store=LogStore(tmp_path / "gateway.db"), logs_dir=tmp_path / "logs")
+    client = TestClient(app)
+    assert client.get("/api/health").status_code == 401
+    assert client.get("/api/health", headers={"x-agentgaurd-internal": "wrong"}).status_code == 401
+    assert client.get("/api/health", headers={"x-agentgaurd-internal": "test-only-gateway-secret"}).status_code == 200
 
 
 def test_conversation_run_and_sse_events_work_offline(tmp_path):

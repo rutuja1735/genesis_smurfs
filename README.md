@@ -1,6 +1,6 @@
-# Agentgaurd — Phases 01–09
+# Agentguard — Phases 01–09
 
-Agentgaurd is a Python backend that plans tool use before execution, applies deterministic policy and provenance checks, detects and neutralizes suspected prompt injections, filters final answers, and records auditable runs. This package includes Phases 01–09: the defense core, OpenRouter client, JSON-backed mock agents, attacks and evaluation, an optional AgentDojo adapter, and a local FastAPI backend.
+Agentguard is a Python backend that plans tool use before execution, applies deterministic policy and provenance checks, detects and neutralizes suspected prompt injections, filters final answers, and records auditable runs. This package includes Phases 01–09: the defense core, OpenRouter client, JSON-backed mock agents, attacks and evaluation, an optional AgentDojo adapter, and a local FastAPI backend.
 
 ## What is included
 
@@ -135,12 +135,15 @@ python -m demo.cli --scenario attack
 python -m demo.scenarios
 ```
 
-The API is a local demo service, not a production deployment: it has no authentication, operational hardening, or multi-user isolation.
+The Python API is a local demo service. With `INTERNAL_API_SECRET` configured,
+it accepts API requests only from the authenticated Next.js gateway. Workspace
+data is shared among signed-in users; per-user data isolation is not implemented.
 
 ## Agent workspace frontend
 
 Open http://localhost:3000/ after starting both servers. The Next.js App Router
-frontend opens directly to Overview with no login or landing page. React
+frontend opens to a public landing page. MiniMoth phone verification at `/login`
+or `/signup` creates a session, then opens the protected `/dashboard`. React
 components manage the screens, forms, preferences, and live execution updates.
 The old http://localhost:8000/ app link redirects to the Next.js frontend.
 
@@ -170,3 +173,30 @@ For production, use `npm run build` followed by `npm start` instead of `npm run 
 Optionally set `BACKEND_URL` in `frontend/.env.local` when the Python server uses
 a different address. Its default is `http://127.0.0.1:8000`. Set `FRONTEND_URL`
 in the backend process environment to change its root redirect destination.
+
+### MiniMoth authentication
+
+Copy `frontend/.env.example` to `frontend/.env.local` and configure:
+
+- `MINIMOTH_API_KEY`: your MiniMoth project key, used only by server code.
+- `SESSION_SECRET`: an independent random value of at least 32 characters.
+- `INTERNAL_API_SECRET`: a second independent random value; set the same value
+  in `backend/.env` so direct Python API calls cannot bypass login.
+- `APP_ORIGIN`: the exact public HTTPS origin when deploying behind a proxy.
+
+Use `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+to generate each secret separately. Keep both `.env` files out of Git.
+
+MiniMoth uses WhatsApp/SMS phone OTP rather than email/password or Google login.
+Phone sign-in requires an `mm_live_` MiniMoth project key for real WhatsApp or SMS OTP delivery. Sandbox keys are rejected; verification codes are never displayed in the app.
+
+Session tokens are encrypted in an HttpOnly, SameSite cookie, with Secure set
+on HTTPS. The gateway validates sessions server-side and rotates expired tokens
+through MiniMoth. Workspace pages, API routes, and API documentation require
+sign-in. Mutations reject cross-origin requests; sign-out revokes the provider
+session and clears the local cookie. Do not expose the Python port publicly.
+
+Run `npm test` in `frontend/` for local auth tests. With the app running, set
+`AUTH_TEST_ORIGIN=http://localhost:3000` to also run anonymous-route and CSRF
+integration checks. These tests do not send OTP messages. The sky image in
+`frontend/public/hero-sky.png` comes from the user-supplied Runway reference.

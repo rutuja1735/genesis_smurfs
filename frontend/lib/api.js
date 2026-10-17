@@ -5,6 +5,9 @@ export async function api(path, options = {}) {
     cache: 'no-store',
   });
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.location.assign('/login?next=' + encodeURIComponent(window.location.pathname));
+    }
     const data = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || data));
   }
