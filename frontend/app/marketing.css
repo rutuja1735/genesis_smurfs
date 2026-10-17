@@ -8,3 +8,155 @@
 @media(max-width:1050px){.hero-security-label{font-size:8px;letter-spacing:.7px}.security-preview-bottom{grid-template-columns:1.2fr 1fr;gap:12px}.preview-plan,.preview-threat{padding:14px}.preview-plan h4{font-size:10px}.preview-plan h4>span{display:none}.preview-user-request{font-size:8px}.plan-step strong{font-size:8px}.plan-step small{font-size:6px}.preview-threat h4{font-size:10px}.preview-threat>p{font-size:8px}.preview-threat code{font-size:7px}.defense-pipeline{gap:13px}.defense-pipeline>article{padding:19px 15px}.defense-pipeline h3{font-size:12px}.defense-pipeline p{font-size:9px}.landing-agent-grid{gap:15px}.landing-agent-grid>article{padding:22px}.landing-agent-grid h3{font-size:18px}.evaluation-counts{gap:30px}.benchmark-note{padding-left:30px;padding-right:30px}.marketing-page .final-cta h2{font-size:39px}}
 @media(max-width:760px){.hero-security-label{font-size:7px;letter-spacing:.4px;padding:8px 10px;gap:6px}.hero-security-label .icon{height:12px;width:12px}.security-preview-bottom{grid-template-columns:1fr}.preview-threat{display:none}.preview-plan h4>span{display:block;font-size:6px}.preview-plan h4{font-size:9px}.preview-user-request{font-size:8px}.plan-step{padding:8px 0}.plan-step strong{font-size:8px}.plan-step small{font-size:6px}.preview-plan{padding:13px}.threat-preview{max-width:480px;margin:auto;width:100%;order:2}.core-question p{font-size:11px}.defense-pipeline{grid-template-columns:1fr 1fr;gap:15px}.defense-pipeline h3{font-size:14px}.defense-pipeline p{font-size:11px}.landing-agent-grid{grid-template-columns:1fr;max-width:500px;margin:auto;gap:18px}.landing-agent-grid>article{padding:25px}.landing-agent-grid>article>p,.landing-agent-grid>article>div{min-height:0}.landing-agent-grid .agent-symbol{margin-bottom:19px}.evaluation-visual{max-width:480px;width:100%;margin:auto}.benchmark-note{margin:-30px auto 0;padding:0 25px 35px;max-width:550px}.mock-data-note{max-width:480px;margin:25px auto 0;font-size:9px}.marketing-page .final-cta h2{font-size:34px}}
 @media(max-width:480px){.hero-security-label{font-size:6px;letter-spacing:.1px;padding:7px 9px;max-width:100%;gap:4px}.hero-security-label .icon{height:11px;width:11px}.security-preview-bottom{margin-top:12px}.plan-step strong{font-size:9px}.plan-step small{font-size:7px}.preview-user-request{font-size:9px}.preview-plan h4{font-size:10px}.threat-top{padding:16px}.threat-top>span:first-child{font-size:9px}.threat-content{padding:17px 16px 10px}.threat-content>p{font-size:11px}.injected-text{font-size:10px;padding:12px}.blocked-call{margin:13px 15px;padding:12px 10px;gap:8px}.blocked-call strong{font-size:9px}.blocked-call small{font-size:8px}.allowed-call{padding:5px 15px 15px;font-size:8px}.defense-pipeline{gap:12px}.defense-pipeline>article{padding:20px 15px}.defense-pipeline h3{font-size:12px}.defense-pipeline p{font-size:10px}.pipeline-number{font-size:20px;right:12px;top:18px}.pipeline-icon{height:28px;width:28px}.pipeline-icon .icon{height:16px;width:16px}.policy-example>strong{font-size:10px;line-height:1.7}.policy-example>div{gap:14px}.policy-example>div>span{font-size:8px}.evaluation-counts{gap:27px}.evaluation-counts strong{font-size:25px}.evaluation-counts span{font-size:8px}.evaluation-visual{padding:20px}.evaluation-metrics strong{font-size:10px}.evaluation-metrics small{font-size:8px}.evaluation-metrics>div{gap:11px}.benchmark-note{padding:0 22px 35px;margin:-25px auto 0}.benchmark-note p{font-size:9px}.marketing-page .final-cta h2{font-size:29px;letter-spacing:-1.1px}}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   ANIMATIONS · Scroll reveal, hero carousel, Unsplash backgrounds
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* ── Scroll reveal system ──────────────────────────────────────────────── */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1);will-change:opacity,transform}
+.reveal-up{transform:translateY(40px)}
+.reveal-down{transform:translateY(-40px)}
+.reveal-left{transform:translateX(50px)}
+.reveal-right{transform:translateX(-50px)}
+.reveal-fade{transform:none}
+.reveal-scale{transform:scale(.92)}
+.reveal-in{opacity:1!important;transform:none!important}
+
+/* ── Hero title entrance animation ────────────────────────────────────── */
+.hero-title-anim{animation:heroTitleIn 1.1s cubic-bezier(.16,1,.3,1) both}
+@keyframes heroTitleIn{0%{opacity:0;transform:translateY(28px) scale(.98);filter:blur(6px)}100%{opacity:1;transform:none;filter:blur(0)}}
+.hero-security-label{animation:fadeSlideDown .8s cubic-bezier(.16,1,.3,1) .15s both}
+.hero>p{animation:fadeSlideUp .8s cubic-bezier(.16,1,.3,1) .3s both}
+.hero-actions{animation:fadeSlideUp .8s cubic-bezier(.16,1,.3,1) .45s both}
+@keyframes fadeSlideDown{0%{opacity:0;transform:translateY(-14px)}100%{opacity:1;transform:none}}
+@keyframes fadeSlideUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:none}}
+
+/* ── Dashboard preview float ──────────────────────────────────────────── */
+.product-preview{animation:floatIn 1.2s cubic-bezier(.16,1,.3,1) .6s both}
+@keyframes floatIn{0%{opacity:0;transform:translateY(40px) scale(.98)}100%{opacity:1;transform:none}}
+.security-preview{animation:floatIn 1.2s cubic-bezier(.16,1,.3,1) .6s both,floatY 6s ease-in-out 2s infinite}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* ── Nav scroll transition ────────────────────────────────────────────── */
+.marketing-nav{transition:background .3s,backdrop-filter .3s,box-shadow .3s}
+
+/* ── Hero carousel ─────────────────────────────────────────────────────── */
+.hero-carousel{position:relative;max-width:1060px;margin:42px auto 0;border-radius:18px;overflow:hidden;box-shadow:0 25px 70px rgba(20,40,60,.28);aspect-ratio:21/9;background:#0f1820}
+.hero-slides{display:flex;height:100%;transition:transform .9s cubic-bezier(.65,0,.35,1);will-change:transform}
+.hero-slide{position:relative;min-width:100%;height:100%;transition:opacity .9s ease}
+.hero-slide-bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.06);transition:transform 8s ease-out;filter:saturate(1.1)}
+.hero-slide:nth-child(1) .hero-slide-bg{animation:kenBurns1 20s ease-in-out infinite alternate}
+.hero-slide:nth-child(2) .hero-slide-bg{animation:kenBurns2 20s ease-in-out infinite alternate}
+.hero-slide:nth-child(3) .hero-slide-bg{animation:kenBurns3 20s ease-in-out infinite alternate}
+@keyframes kenBurns1{0%{transform:scale(1.06) translate(0,0)}100%{transform:scale(1.18) translate(-2%,-1%)}}
+@keyframes kenBurns2{0%{transform:scale(1.06) translate(0,0)}100%{transform:scale(1.18) translate(2%,-1%)}}
+@keyframes kenBurns3{0%{transform:scale(1.06) translate(0,0)}100%{transform:scale(1.18) translate(-1%,2%)}}
+.hero-slide-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(8,16,28,.72) 0%,rgba(8,30,60,.48) 50%,rgba(10,20,35,.68) 100%)}
+.hero-slide-content{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 8%;text-align:left}
+.hero-slide-label{display:inline-flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1.8px;font-weight:700;text-transform:uppercase;padding:8px 14px;border-radius:30px;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);margin-bottom:22px;animation:slideContentIn .8s cubic-bezier(.16,1,.3,1) .1s both}
+.hero-slide-label .icon{width:15px;height:15px}
+.hero-slide-title{font-size:44px;line-height:1.1;letter-spacing:-1.6px;font-weight:700;color:#fff;white-space:pre-line;margin:0 0 16px;max-width:580px;animation:slideContentIn .8s cubic-bezier(.16,1,.3,1) .2s both;text-shadow:0 2px 30px rgba(0,0,0,.3)}
+.hero-slide-subtitle{font-size:15px;line-height:1.65;color:rgba(255,255,255,.82);max-width:500px;margin:0;animation:slideContentIn .8s cubic-bezier(.16,1,.3,1) .35s both}
+@keyframes slideContentIn{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:none}}
+
+/* Nav arrows */
+.hero-nav{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);backdrop-filter:blur(10px);display:grid;place-items:center;cursor:pointer;transition:background .25s,transform .25s,opacity .25s;z-index:5}
+.hero-nav:hover{background:rgba(255,255,255,.28);transform:translateY(-50%) scale(1.08)}
+.hero-nav .icon{width:20px;height:20px;color:#fff;stroke-width:2}
+.hero-nav-prev{left:16px}
+.hero-nav-prev .icon{transform:rotate(180deg)}
+.hero-nav-next{right:16px}
+
+/* Dots */
+.hero-dots{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
+.hero-dot{width:8px;height:8px;border-radius:50%;border:1px solid rgba(255,255,255,.5);background:transparent;cursor:pointer;transition:all .3s;padding:0}
+.hero-dot.active{background:#fff;border-color:#fff;transform:scale(1.3);box-shadow:0 0 8px rgba(255,255,255,.6)}
+
+/* Progress bars */
+.hero-progress{position:absolute;bottom:0;left:0;right:0;display:flex;height:3px;z-index:5}
+.hero-progress-bar{flex:1;background:rgba(255,255,255,.15);transition:background .3s;position:relative;overflow:hidden}
+.hero-progress-bar.active{background:rgba(255,255,255,.25)}
+.hero-progress-bar.active::after{content:"";position:absolute;inset:0;background:#fff;transform-origin:left;animation:progressFill 6s linear forwards}
+.hero-progress-bar.done{background:rgba(255,255,255,.45)}
+@keyframes progressFill{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+
+/* ── Unsplash section backgrounds ─────────────────────────────────────── */
+.unsplash-bg{position:relative}
+.unsplash-bg::before{content:"";position:absolute;inset:0;background-image:var(--bg-image);background-size:cover;background-position:center;opacity:.06;pointer-events:none;z-index:0}
+.unsplash-bg>.marketing-section,.unsplash-bg>.section-intro,.unsplash-bg>*{position:relative;z-index:1}
+
+/* ── Enhanced section polish ──────────────────────────────────────────── */
+/* Gradient text for section eyebrows */
+.eyebrow{background:linear-gradient(135deg,#1687ec,#4ba8e8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* Glassmorphism cards on hover */
+.capability{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s,border-color .35s}
+.capability:hover{transform:translateY(-6px);box-shadow:0 20px 50px rgba(20,50,90,.12);border-color:#c5dcf0}
+
+/* Defense pipeline card hover */
+.defense-pipeline>article{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s,border-color .35s}
+.defense-pipeline>article:hover{transform:translateY(-5px);box-shadow:0 18px 45px rgba(20,50,90,.1);border-color:#d0e4f7}
+.defense-pipeline>article:hover .pipeline-icon{transform:scale(1.1) rotate(-3deg)}
+.pipeline-icon{transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+
+/* Agent grid card hover with glow */
+.landing-agent-grid>article{transition:transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s,border-color .4s}
+.landing-agent-grid>article:hover{transform:translateY(-8px);box-shadow:0 25px 60px rgba(20,50,90,.15);border-color:#bdd8f5}
+.landing-agent-grid .agent-symbol{transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+.landing-agent-grid>article:hover .agent-symbol{transform:scale(1.12) rotate(-5deg)}
+
+/* AI grid card hover */
+.ai-grid>article{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s}
+.ai-grid>article:hover{transform:translateY(-6px);box-shadow:0 15px 40px rgba(20,50,90,.08)}
+
+/* Inline CTA gradient */
+.inline-cta{background:linear-gradient(135deg,#edf4fc,#e8f4fd,#f0f8fe);transition:box-shadow .3s}
+.inline-cta:hover{box-shadow:0 12px 35px rgba(20,80,160,.12)}
+
+/* Final CTA with Unsplash overlay */
+.final-cta.unsplash-bg::before{opacity:.1}
+.final-cta .brand-mark{animation:spinIn 1s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes spinIn{0%{opacity:0;transform:rotate(-180deg) scale(.5)}100%{opacity:1;transform:none}}
+
+/* Threat preview subtle float */
+.threat-preview{animation:threatFloat 5s ease-in-out infinite}
+@keyframes threatFloat{0%,100%{transform:rotate(-1.5deg) translateY(0)}50%{transform:rotate(-1.5deg) translateY(-6px)}}
+
+/* Evaluation visual subtle float */
+.evaluation-visual{animation:evalFloat 5s ease-in-out infinite}
+@keyframes evalFloat{0%,100%{transform:rotate(2deg) translateY(0)}50%{transform:rotate(2deg) translateY(-6px)}}
+
+/* Button shimmer on hover */
+.marketing-button{position:relative;overflow:hidden;transition:transform .2s,background .2s,box-shadow .3s}
+.marketing-button::after{content:"";position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);transition:left .6s}
+.marketing-button:hover::after{left:120%}
+.marketing-button:hover{box-shadow:0 8px 25px rgba(22,135,236,.25)}
+
+/* Nav CTA pulse */
+.nav-cta{animation:navPulse 3s ease-in-out infinite}
+@keyframes navPulse{0%,100%{box-shadow:0 2px 3px rgba(22,135,236,.08)}50%{box-shadow:0 4px 14px rgba(22,135,236,.2)}}
+
+/* Execution stamp bounce-in */
+.execution-stamp{animation:stampIn 1s cubic-bezier(.34,1.56,.64,1) .5s both}
+@keyframes stampIn{0%{opacity:0;transform:rotate(2deg) scale(.7)}100%{opacity:1;transform:rotate(2deg) scale(1)}}
+
+/* Footer fade-in */
+.marketing-footer{animation:fadeSlideUp 1s cubic-bezier(.16,1,.3,1) both}
+
+/* ── Responsive carousel ──────────────────────────────────────────────── */
+@media(max-width:760px){
+  .hero-carousel{aspect-ratio:16/10;margin-top:32px}
+  .hero-slide-title{font-size:28px;letter-spacing:-1px}
+  .hero-slide-subtitle{font-size:13px}
+  .hero-slide-content{padding:0 7%}
+  .hero-nav{width:38px;height:38px}
+  .hero-nav .icon{width:16px;height:16px}
+}
+@media(max-width:480px){
+  .hero-carousel{aspect-ratio:4/3;border-radius:12px}
+  .hero-slide-title{font-size:22px}
+  .hero-slide-subtitle{font-size:12px;max-width:90%}
+  .hero-slide-label{font-size:8px;padding:6px 10px}
+  .hero-nav{width:34px;height:34px}
+}
