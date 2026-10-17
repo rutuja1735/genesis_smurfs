@@ -114,7 +114,10 @@ def filter_answer(answer: str, ctx: OutputFilterContext) -> FilterResult:
             text = text.replace(url, f"[link removed: {host}]", 1)
 
     # F4: ground IBANs, e-mails, and monetary values against raw sources.
-    for pattern, kind in ((_IBAN, "IBAN"), (_EMAIL, "email address"), (_AMOUNT, "amount")):
+    # Match a compact identifier as a single token. The broader policy scanner's
+    # whitespace-tolerant pattern can consume ordinary words after an IBAN.
+    iban_pattern = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b|\b(?:GB|DE)\d{2}(?:\s[A-Z0-9]{4}){4}\s[A-Z0-9]{2}\b|\bFR\d{2}(?:\s[A-Z0-9]{4}){5}\s[A-Z0-9]{3}\b", re.I)
+    for pattern, kind in ((iban_pattern, "IBAN"), (_EMAIL, "email address"), (_AMOUNT, "amount")):
         for match in list(pattern.finditer(text)):
             value = match.group(0).strip()
             if not _grounded(value, ctx):
@@ -126,6 +129,10 @@ def filter_answer(answer: str, ctx: OutputFilterContext) -> FilterResult:
     for match in list(claims.finditer(text)):
         claim = match.group(0)
         claim_lower = claim.casefold()
+        prefix = re.split(r"[.!?;\n]|\b(?:but|however)\b", text[:match.start()], flags=re.I)[-1]
+        # A denial of an action is not a claim that the action happened.
+        if re.search(r"\b(?:no|not|never|neither|without)\b|\b\w+n['’]t\b", prefix, re.I) or re.search(r"^(?:I\s+)?(?:sent|forwarded|deleted|paid|transferred)\s+(?:no|nothing|none)\b", claim, re.I):
+            continue
         if "forward" in claim_lower:
             expected = ("forward",)
         elif "delet" in claim_lower:
@@ -137,7 +144,7 @@ def filter_answer(answer: str, ctx: OutputFilterContext) -> FilterResult:
         executed = bool(ctx.executed_calls) and ctx.action_completed and any(any(term in name.casefold() for term in expected) for name in ctx.executed_calls)
         if not executed:
             decisions.append(_fmt("F5", claim=claim[:100], excerpt=claim[:100]))
-            replacement = "That action was not completed."
+            replacement = "That action was not completed" + ("." if match.end() == len(text) else "")
             text = text.replace(claim, replacement, 1)
 
     # F6: secrets/account values are masked unless explicitly requested.

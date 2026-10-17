@@ -87,10 +87,11 @@ class EmailAgent(JsonAgent):
         return {"id": email_id, "deleted": True}
 
     def specs(self) -> list[ToolSpec]:
+        # Record handles come from the email store; they do not endorse message content.
         return [
-            ToolSpec("email.list_inbox", "email", self.list_inbox, ListInboxArgs, "read", output_trust={"emails.*.from": "untrusted", "emails.*.subject": "untrusted", "emails.*.body": "untrusted"}, description="List inbox messages"),
-            ToolSpec("email.read_email", "email", self.read_email, EmailIdArgs, "read", output_trust={"from": "untrusted", "subject": "untrusted", "body": "untrusted"}, sink_params={"email_id": "identifier"}, description="Read a message by id"),
-            ToolSpec("email.search_emails", "email", self.search_emails, SearchEmailArgs, "read", output_trust={"emails.*.from": "untrusted", "emails.*.subject": "untrusted", "emails.*.body": "untrusted"}, description="Search email"),
+            ToolSpec("email.list_inbox", "email", self.list_inbox, ListInboxArgs, "read", output_trust={"emails.*.id": "trusted", "emails.*.from": "untrusted", "emails.*.subject": "untrusted", "emails.*.body": "untrusted"}, description="List inbox messages"),
+            ToolSpec("email.read_email", "email", self.read_email, EmailIdArgs, "read", output_trust={"id": "trusted", "from": "untrusted", "subject": "untrusted", "body": "untrusted"}, sink_params={"email_id": "identifier"}, description="Read a message by id"),
+            ToolSpec("email.search_emails", "email", self.search_emails, SearchEmailArgs, "read", output_trust={"emails.*.id": "trusted", "emails.*.from": "untrusted", "emails.*.subject": "untrusted", "emails.*.body": "untrusted"}, description="Search email"),
             ToolSpec("email.mark_read", "email", self.mark_read, EmailIdArgs, "write", sink_params={"email_id": "identifier"}, description="Mark a message read"),
             ToolSpec("email.create_draft", "email", self.create_draft, DraftArgs, "write", sink_params={"to": "recipient", "body": "body"}, description="Create an email draft", intent_verbs=("draft", "prepare")),
             ToolSpec("email.send_email", "email", self.send_email, SendArgs, "high_impact", sink_params={"to": "recipient", "cc": "recipient", "body": "body"}, description="Send an email", intent_verbs=("send", "email")),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import os
 import subprocess
@@ -14,7 +15,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -30,11 +32,23 @@ from .schemas import ConversationCreate, ConversationMessage, EvalCreate, RunCre
 
 
 def create_app(*, store: LogStore | None = None, logs_dir: str | Path | None = None) -> FastAPI:
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     root = Path(logs_dir or os.getenv("AGENTGAURD_LOGS", "logs"))
     root.mkdir(parents=True, exist_ok=True)
     db = store or LogStore(root / "index.db")
     bus = EventBus()
     app = FastAPI(title="Agentgaurd API", version="0.9.0")
+
+    @app.middleware("http")
+    async def require_frontend_gateway(request, call_next):
+        # With authentication enabled, only the authenticated Next.js gateway
+        # may call the Python API. Keep this port on loopback in local setups.
+        secret = os.getenv("INTERNAL_API_SECRET", "")
+        if secret and (request.url.path.startswith("/api/") or request.url.path in {"/docs", "/openapi.json"}):
+            supplied = request.headers.get("x-agentgaurd-internal", "")
+            if not hmac.compare_digest(supplied, secret):
+                return JSONResponse({"detail": "Use the authenticated frontend gateway."}, status_code=401)
+        return await call_next(request)
     app.state.store, app.state.logs_dir, app.state.event_bus = db, root, bus
     app.state.llm_factory = lambda **kw: OpenRouterClient(config=OpenRouterConfig.from_env(), store=kw["store"], audit=kw["audit"], run_id=kw["run_id"])
     app.state.active_eval = None

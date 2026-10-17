@@ -1,2 +1,3 @@
-import { Overview } from '../components/views';
-export default function Page() { return <Overview />; }
+import Landing from '../components/landing';
+export const metadata = { title: 'Agentguard — Separating Data from Authority' };
+export default function Page() { return <Landing />; }
