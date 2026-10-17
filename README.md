@@ -11,7 +11,7 @@ Agentgaurd is a Python backend that plans tool use before execution, applies det
 - Phase 08: optional AgentDojo Track B adapter with fail-closed risk mapping, sink metadata, profile configuration, capped pair batching, and a subprocess entry point. AgentDojo is not required by the main environment.
 - Phase 09: FastAPI endpoints for conversations, messages, runs, SSE event streaming, decisions, statistics, evaluation batches, mock data, and configuration; JSONL audit logs indexed in SQLite; log reindexing.
 
-A local agent workspace frontend is included in `frontend/` and is served at the API root.
+A Next.js App Router frontend is included in `frontend/` and connects to the Python API.
 
 ## Install and test
 
@@ -137,15 +137,17 @@ python -m demo.scenarios
 
 ## Agent workspace frontend
 
-Open http://localhost:8000/ after starting the API. The frontend opens directly to
-Overview with no login or landing page. It is served by FastAPI from `frontend/`,
-so no separate Node server or frontend build is required.
+Open http://localhost:3000/ after starting both servers. The Next.js App Router
+frontend opens directly to Overview with no login or landing page. React
+components manage the screens, forms, preferences, and live execution updates.
+The old http://localhost:8000/ app link redirects to the Next.js frontend.
 
 The workspace includes agent runs with live SSE execution events, analytics,
 Email/Slack/Banking agent tasks and mock data, injection scenarios, evaluation
 batches, audit decisions, JSON exports, and browser-local execution preferences.
-The interface uses the existing REST API. OpenRouter credentials stay in the
-backend environment. Agent data is mock data, not live connected accounts.
+Next.js proxies `/api/*`, `/docs`, and `/openapi.json` to the Python backend,
+including SSE streams. OpenRouter credentials stay in `backend/.env`; they are
+never included in the browser bundle. Agent data is mock data, not live accounts.
 
 For the Python environment prepared in this workspace:
 
@@ -153,6 +155,19 @@ For the Python environment prepared in this workspace:
 cd backend
 .\.venv312\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8000
 ```
+
+In a second terminal (Node.js 20.9 or newer):
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+For production, use `npm run build` followed by `npm start` instead of `npm run dev`.
+Optionally set `BACKEND_URL` in `frontend/.env.local` when the Python server uses
+a different address. Its default is `http://127.0.0.1:8000`. Set `FRONTEND_URL`
+in the backend process environment to change its root redirect destination.
 
 ## Email Agent REST API (Frontend Reference)
 

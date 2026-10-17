@@ -39,3 +39,9 @@ logs/
 .DS_Store
 Thumbs.db
 .venv312/
+
+# Next.js
+node_modules/
+.next/
+frontend/out/
+frontend/.env.local
