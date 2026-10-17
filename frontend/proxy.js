@@ -5,6 +5,18 @@ import { SESSION_COOKIE } from './lib/auth-session.mjs';
 export async function proxy(request) {
   const path = request.nextUrl.pathname;
   const isAPI = path.startsWith('/api/');
+
+  // Local development bypass: when MiniMoth is not configured, skip auth so
+  // the workspace is accessible without phone OTP. Production deployments
+  // must set MINIMOTH_API_KEY and SESSION_SECRET to enforce authentication.
+  if (!process.env.MINIMOTH_API_KEY) {
+    const headers = new Headers(request.headers);
+    if (process.env.INTERNAL_API_SECRET) headers.set('x-agentgaurd-internal', process.env.INTERNAL_API_SECRET);
+    const response = NextResponse.next({ request: { headers } });
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
+  }
+
   if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !sameOrigin(request)) return NextResponse.json({ error: 'Cross-origin requests are not allowed.' }, { status: 403 });
   if (path.startsWith('/api/auth/')) return NextResponse.next();
   let auth;
