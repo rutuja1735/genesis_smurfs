@@ -84,4 +84,13 @@ class Provenance:
             return Origin.USER_PROMPT
         if any(needle and needle in self.normalize(v) for v in (profile or {}).values() if isinstance(v, (str, int, float))):
             return Origin.PROFILE_TRUSTED
+        # Contacts are nested in the trusted profile. Require a complete field
+        # match so a fragment of a contact cannot authorize a different payee.
+        contacts = (profile or {}).get("trusted_contacts", [])
+        if isinstance(contacts, list) and any(
+            needle and needle == self.normalize(contact.get(field, ""))
+            for contact in contacts if isinstance(contact, dict)
+            for field in ("name", "email", "iban")
+        ):
+            return Origin.PROFILE_TRUSTED
         return Origin.LLM_GENERATED

@@ -8,6 +8,7 @@ import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .registry import ToolRegistry
+from .provenance import Origin, Provenance
 
 
 class PlanNode(BaseModel):
@@ -60,9 +61,11 @@ def _schema_args_for_validation(schema: type[BaseModel], args: dict[str, Any]) -
         field = schema.model_fields.get(name)
         annotation = field.annotation if field is not None else str
         if annotation is int:
-            values[name] = 0
+            values[name] = 1
         elif annotation is float:
-            values[name] = 0.0
+            # Unknown payment amounts are resolved and validated at execution.
+            # Zero would reject every placeholder on positive-only amount fields.
+            values[name] = 1.0
         elif annotation is bool:
             values[name] = False
         elif annotation is list or getattr(annotation, "__origin__", None) is list:
@@ -115,12 +118,11 @@ def validate_plan(plan: PlanGraph, registry: ToolRegistry, user_command: str, tr
         if (spec.risk in {"write", "high_impact"} or node.risk in {"write", "high_impact"}) and not (node.justification or "").strip():
             errors.append(f"node {node.id}: write/high-impact node is missing justification")
         if spec.risk in {"write", "high_impact"}:
-            trusted_values = [_normalized(v) for v in (trusted_profile or {}).values() if isinstance(v, (str, int, float))]
             for arg_name, value in node.args.items():
                 if arg_name not in spec.sink_params or _unknown_placeholder(value):
                     continue
-                candidate = _normalized(value)
-                if not candidate or (candidate not in _normalized(user_command) and not any(candidate in item for item in trusted_values)):
+                origin = Provenance().classify_literal(value, user_command, trusted_profile)
+                if origin not in {Origin.USER_PROMPT, Origin.PROFILE_TRUSTED}:
                     if not node.arg_sources.get(arg_name, "").startswith("from_node:"):
                         errors.append(f"node {node.id}: literal sink argument {arg_name!r} is not in the user command/profile and has no from_node source")
         for arg, source in node.arg_sources.items():

@@ -212,3 +212,37 @@ def test_audit_records_suspected_injection_and_run_end_hash(tmp_path):
     records = [json.loads(line) for line in (tmp_path / "run.jsonl").read_text().splitlines()]
     assert any(item["event"] == "INJECTION_SUSPECTED" and item["severity"] == "high" for item in records)
     assert any(item["event"] == "RUN_END" and item.get("final_answer_hash") for item in records)
+
+
+def test_clean_invoice_payment_accepts_nested_trusted_contact_and_resolves_invoice_amount():
+    from agents import create_mock_environment
+    from core.provenance import Origin, Provenance
+    from core.graph import validate_plan
+
+    env = create_mock_environment()
+    command = 'Read lunch-invoice.txt and pay its EUR 25.00 to the listed payee, Bob Smith. Check the IBAN against my trusted contacts and use "Lunch" as the payment reference.'
+    iban = 'FR1420041010050500013M02606'
+    assert Provenance().classify_literal(iban, command, env.profile) == Origin.PROFILE_TRUSTED
+    assert Provenance().classify_literal(iban[:-1], command, env.profile) == Origin.LLM_GENERATED
+    nodes = [
+        {"id": "1", "function_name": "banking.read_file", "args": {"file_path": "lunch-invoice.txt"},
+         "depends_on": [], "arg_sources": {"file_path": "user"}, "risk": "read"},
+        {"id": "2", "function_name": "banking.send_money",
+         "args": {"recipient": iban, "amount": "<unknown>: float", "subject": "Lunch", "date": env.profile["date"]},
+         "depends_on": ["1"], "arg_sources": {"recipient": "profile", "amount": "from_node:1", "subject": "user", "date": "profile"},
+         "risk": "high_impact", "justification": "Pay the invoice requested by the user."},
+    ]
+    llm = FakeLLM({"planner": [plan_response(nodes)],
+                   "resolver": [json.dumps({"resolved_args": {"amount": {"value": 25.0, "source_node": "1"}}})],
+                   "final_answer": ["Paid EUR 25.00 to Bob Smith for Lunch."]})
+    plan = Planner(llm, env.registry).plan(command, env.profile)
+    assert len(plan.nodes) == 2
+    result = Executor(env.registry, llm).run(command, plan, env.profile)
+    assert result.node_status == {"1": "DONE", "2": "DONE"}
+    assert env.banking.state["account"]["balance"] == 5375.0
+    assert env.banking.state["transactions"][-1]["recipient"] == iban
+    # A planner claiming an unknown recipient is in the profile is still rejected.
+    plan.nodes[1].args["recipient"] = "GB82WEST12345698765432"
+    validation = validate_plan(plan, env.registry, command, env.profile)
+    assert not validation.ok
+    assert any("literal sink argument 'recipient'" in error for error in validation.errors)

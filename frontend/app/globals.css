@@ -32,3 +32,5 @@
 .markdown-response th{font-weight:600;color:#344256;background:#f5f8fb;letter-spacing:normal}
 .markdown-response .contains-task-list{list-style:none;padding-left:.3em}
 .markdown-response .task-list-item input{width:auto;margin-right:.5em;vertical-align:middle}
+
+.execution-trail-panel{align-self:start}.execution-trail{padding:0 24px 24px}.execution-trail>summary{cursor:pointer;color:var(--blue);font-size:12px;padding:12px 0;user-select:none}.trail-count{color:var(--muted);font-size:11px;margin-left:12px}.trail-collapse{display:none}.execution-trail[open]>summary .trail-expand{display:none}.execution-trail[open]>summary .trail-collapse{display:inline}.execution-trail-events{max-height:560px;overflow:auto;padding:20px 8px 0 0;scrollbar-gutter:stable}
