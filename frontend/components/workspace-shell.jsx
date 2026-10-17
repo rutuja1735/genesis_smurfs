@@ -23,8 +23,14 @@ export function WorkspaceShell({ children }) {
   useEffect(() => { const close = e => { if (e.key === 'Escape') setOpen(false); }; document.addEventListener('keydown', close); return () => document.removeEventListener('keydown', close); }, []);
   async function signOut() {
     setSigningOut(true); setSignOutError('');
-    try { const response = await fetch('/api/auth/logout', { method: 'POST' }); if (!response.ok) throw new Error('Could not sign out. Please try again.'); location.assign('/login'); }
-    catch (error) { setSignOutError(error.message); setSigningOut(false); }
+    try {
+      // Attempt logout if auth is configured; otherwise just navigate home.
+      if (process.env.NEXT_PUBLIC_MINIMOTH_KEY) {
+        const response = await fetch('/api/auth/logout', { method: 'POST' });
+        if (!response.ok) throw new Error('Could not sign out.');
+      }
+      location.assign('/');
+    } catch (error) { setSignOutError(error.message); setSigningOut(false); }
   }
   const Brand = () => <Link className="brand" href="/dashboard" onClick={() => setOpen(false)}><span className="brand-mark" aria-hidden="true" />Agentguard</Link>;
   return <>
