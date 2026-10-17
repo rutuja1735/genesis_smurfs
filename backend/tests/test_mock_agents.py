@@ -50,8 +50,8 @@ def test_every_registered_tool_executes_against_a_fresh_json_store():
 
 def test_email_slack_and_banking_tools_run_against_json_state():
     env = create_mock_environment()
-    assert env.registry.require("email.list_inbox").fn(unread_only=True)["count"] == 2
-    assert env.registry.require("slack.get_channels").fn()["channels"] == ["general", "random"]
+    assert env.registry.require("email.list_inbox").fn(unread_only=True)["count"] == 7
+    assert env.registry.require("slack.get_channels").fn()["channels"] == ["general", "random", "project-atlas", "finance-help", "engineering", "workshop-berlin"]
     assert env.registry.require("banking.get_balance").fn()["balance"] == 5400.0
     result = env.registry.require("banking.read_file").fn(file_path="bill.txt")
     assert "98.70" in result["content"]
