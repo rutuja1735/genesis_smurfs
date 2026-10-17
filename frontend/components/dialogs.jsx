@@ -19,11 +19,13 @@ export function RunDialog({ task, agent, close }) {
   const [selectedAgents, setSelectedAgents] = useState(
     Object.keys(agentInfo).filter(id => !agent || id === agent)
   );
-  const [emailAgent, setEmailAgent] = useState(
-    emailStatus?.configured_agent === 'real' ? 'real' : 'mock'
-  );
-  const emailSelected = selectedAgents.includes('email');
   const realEmailReady = emailStatus?.auth?.configured === true;
+
+  // Auto-detect email-related prompts and switch to real email when configured
+  const EMAIL_KEYWORDS = /\b(email|mail|inbox|unread|send|draft|forward|reply|message|read my)\b/i;
+  function shouldUseRealEmail(command, agents) {
+    return agents.includes('email') && realEmailReady && EMAIL_KEYWORDS.test(command);
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -34,7 +36,7 @@ export function RunDialog({ task, agent, close }) {
     setPending(true); setError('');
     try {
       const body = { command, agents, defense: data.get('defense'), neutralize: data.get('neutralize'), output_filter: data.has('output_filter') };
-      if (agents.includes('email')) body.email_agent = emailAgent;
+      if (shouldUseRealEmail(command, agents)) body.email_agent = 'real';
       const result = await post('/runs', body);
       await refresh(); router.push(`/runs/${result.run_id}`); notify('Agent run started'); close();
     } catch (e) { setError(e.message); setPending(false); }
@@ -43,10 +45,9 @@ export function RunDialog({ task, agent, close }) {
   return <Modal title="New agent run" close={close} onSubmit={submit} submitLabel="Start run" pending={pending} error={error}>
     <Field label="What should your agents do?" name="run-command"><textarea id="run-command" name="command" required maxLength={12000} placeholder="e.g. Summarize my unread emails" defaultValue={task?.prompt || ''} /></Field>
     <div className="field"><span className="field-label">Agents</span><div className="agent-checks">{Object.entries(agentInfo).map(([id, a]) => <label key={id}><input type="checkbox" name="agents" value={id} defaultChecked={!agent || id === agent} onChange={e => setSelectedAgents(prev => e.target.checked ? [...prev, id] : prev.filter(x => x !== id))} /><Icon name={a.icon} />{pretty(id)}</label>)}</div></div>
-    {emailSelected && <div className="field"><span className="field-label">Email data source</span><div className="radio-group"><label><input type="radio" name="email_agent_radio" value="mock" checked={emailAgent === 'mock'} onChange={() => setEmailAgent('mock')} />Mock environment <small>isolated JSON data</small></label><label><input type="radio" name="email_agent_radio" value="real" checked={emailAgent === 'real'} onChange={() => setEmailAgent('real')} disabled={!realEmailReady} />Real email {!realEmailReady && <small className="warn">— credentials not configured</small>}</label></div></div>}
     <div className="form-grid"><Field label="Defense" name="defense"><DefenseSelect defaultValue={preferences.defense} /></Field><Field label="Neutralization" name="neutralize"><NeutralizeSelect defaultValue={preferences.neutralize} /></Field></div>
     <label className="switch-line"><span className="field-label">Filter final answer</span><input type="checkbox" className="switch" name="output_filter" defaultChecked={preferences.output_filter} /></label>
-    <Note>{emailAgent === 'real' && emailSelected ? 'Real email mode: actions respect dry-run and allowlist settings. Runs always go through the security pipeline.' : 'Runs use isolated mock agents and your configured OpenRouter model. Model requests count toward your workspace budget.'}</Note>
+    <Note>Runs use mock agents by default. Email-related prompts automatically use your real inbox when credentials are configured. All runs go through the security pipeline.</Note>
   </Modal>;
 }
 export function EvaluationDialog({ close }) {
