@@ -276,13 +276,25 @@ class RealEmailAgent:
         return self._email_to_dict(msg)
 
     def search_emails(self, query: str, sender: str | None = None) -> dict[str, Any]:
-        q = query
-        if sender:
-            q = f"{q} from:{sender}"
-        msgs = self._backend.list_messages(query=q)
+        # If no explicit sender but query looks like a name/address (no spaces),
+        # search it as both sender and subject so "afnan" finds FROM:afnan emails.
+        effective_sender = sender
+        effective_query = query
+        if not sender and query and ' ' not in query.strip():
+            # Single-word query: treat as sender name too
+            effective_sender = query
+            effective_query = query
+        msgs = self._backend.list_messages(
+            query=effective_query, sender=effective_sender
+        )
+        # If sender search returned nothing, fall back to subject-only search
+        if not msgs and effective_sender:
+            msgs = self._backend.list_messages(query=effective_query, sender=None)
+        # Last resort: return recent emails so the LLM has context to work with
+        if not msgs and effective_query:
+            msgs = self._backend.list_messages(query=None, sender=None)
         rows = [self._email_to_dict(m) for m in msgs]
         return {"emails": rows, "count": len(rows)}
-
     def mark_read(self, email_id: str) -> dict[str, Any]:
         result = self._backend.mark_read(email_id)
         return result

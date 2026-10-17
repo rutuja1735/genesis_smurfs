@@ -5,9 +5,9 @@ import { api, active } from '../lib/api';
 import { RunDialog, EvaluationDialog } from './dialogs';
 
 const WorkspaceContext = createContext(null);
-const initial = { runs: [], stats: { decisions: {}, rules: {} }, tasks: [], attacks: [], goals: [], config: {}, decisions: [], evals: [] };
+const initial = { runs: [], stats: { decisions: {}, rules: {} }, tasks: [], attacks: [], goals: [], config: {}, decisions: [], evals: [], emailStatus: null };
 const defaultPreferences = { defense: 'ours', neutralize: 'redact', output_filter: true };
-const endpoints = { runs: '/runs?limit=500', stats: '/stats', tasks: '/tasks', attacks: '/attacks', goals: '/goals', config: '/config', decisions: '/decisions?limit=500', evals: '/evals' };
+const endpoints = { runs: '/runs?limit=500', stats: '/stats', tasks: '/tasks', attacks: '/attacks', goals: '/goals', config: '/config', decisions: '/decisions?limit=500', evals: '/evals', emailStatus: '/email/status' };
 
 export function WorkspaceProvider({ children }) {
   const [data, setData] = useState(initial);

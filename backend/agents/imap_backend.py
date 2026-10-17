@@ -212,22 +212,47 @@ class ImapBackend:
         query: str = "",
         max_results: int = 20,
         unread_only: bool = False,
+        sender: str | None = None,
     ) -> list[NormalizedEmail]:
         imap = self._get_imap()
         imap.select("INBOX")
-        criterion = "UNSEEN" if unread_only else "ALL"
-        if query:
-            criterion = f'({criterion} SUBJECT "{query}")'
-        _, data = imap.search(None, criterion)
+        base = "UNSEEN" if unread_only else "ALL"
+        if sender and query:
+            # Sender + keyword: match sender address AND subject keyword
+            _, data = imap.search(None, "FROM", sender, "SUBJECT", query)
+            if not data[0]:
+                # Widen: just match sender
+                _, data = imap.search(None, "FROM", sender)
+        elif sender:
+            # Sender search: try exact FROM match first
+            _, data = imap.search(None, "FROM", sender)
+        elif query:
+            # Keyword: SUBJECT only to avoid full-body scan timeout on large mailboxes
+            _, data = imap.search(None, "SUBJECT", query)
+        else:
+            _, data = imap.search(None, base)
         ids = (data[0].split() if data and data[0] else [])[-max_results:]
+        if not ids:
+            return []
+        # Batch fetch all headers in a single IMAP round-trip for speed
+        id_range = b','.join(ids)
         results = []
-        for msg_id_bytes in ids:
+        try:
+            _, fetch_data = imap.fetch(id_range, '(RFC822.HEADER FLAGS)')
+        except Exception:
+            fetch_data = []
+        # fetch_data alternates between (seqnum b'headers') and b')'
+        msg_id_iter = iter([mid.decode() if isinstance(mid, bytes) else str(mid) for mid in ids])
+        for item in fetch_data:
+            if not isinstance(item, tuple):
+                continue
             try:
-                msg_id = msg_id_bytes.decode() if isinstance(msg_id_bytes, bytes) else str(msg_id_bytes)
-                email_obj = self._fetch(msg_id, full=False)
-                results.append(email_obj)
-            except Exception as exc:
-                log.warning("IMAP fetch failed for %s: %s", msg_id_bytes, exc)
+                msg_id = next(msg_id_iter)
+                import email as _elib
+                msg = _elib.message_from_bytes(item[1])
+                results.append(self._normalize(msg_id, msg, full=False))
+            except (StopIteration, Exception) as exc:
+                log.warning("IMAP batch fetch parse error: %s", exc)
         return results
 
     def get_message(self, id: str) -> NormalizedEmail:
@@ -287,6 +312,7 @@ class ImapBackend:
 
     def _fetch(self, msg_id: str, *, full: bool) -> NormalizedEmail:
         imap = self._get_imap()
+        imap.select("INBOX")
         fetch_parts = "(RFC822)" if full else "(RFC822.HEADER FLAGS)"
         _, data = imap.fetch(msg_id, fetch_parts)
         raw_bytes = b""

@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useWorkspace } from './workspace-provider';
-import { active, date, download, money, pretty } from '../lib/api';
+import { active, date, download, money, pretty, post } from '../lib/api';
 import { AgentCards } from './agents';
 import { Badge, Button, Chart, DefenseSelect, Empty, Field, Header, Icon, NeutralizeSelect, Note, Panel, RunTable, SectionHeading, Stat } from './ui';
-
 export function Overview() {
   const { runs, stats, loading, newRun } = useWorkspace();
   const [mode, setMode] = useState('runs');
@@ -42,7 +41,109 @@ export function Decisions() {
 }
 
 export function Settings() {
-  const { preferences, savePreferences, config, online } = useWorkspace();
+  const { preferences, savePreferences, config, online, emailStatus, refresh } = useWorkspace();
+  const [emailPending, setEmailPending] = useState(false);
+  const [emailMsg, setEmailMsg] = useState('');
+  const [allowlistInput, setAllowlistInput] = useState(emailStatus?.send_allowlist?.join(', ') || '');
+
   function submit(e) { e.preventDefault(); const data = new FormData(e.currentTarget); savePreferences({ defense: data.get('defense'), neutralize: data.get('neutralize'), output_filter: data.has('output_filter') }); }
-  return <><Header title="Settings" description="Your workspace configuration and execution preferences." /><div className="two-columns"><Panel title="Execution defaults" subtitle="Used when starting a new agent run"><form className="panel-pad" onSubmit={submit} key={JSON.stringify(preferences)}><Field label="Defense mode" name="defense"><DefenseSelect defaultValue={preferences.defense} /></Field><Field label="Injection neutralization" name="neutralize"><NeutralizeSelect defaultValue={preferences.neutralize} /></Field><label className="switch-line"><span><h3>Filter final answers</h3><p>Check sensitive content and grounding</p></span><input className="switch" type="checkbox" name="output_filter" defaultChecked={preferences.output_filter} /></label><Note>Preferences are saved in this browser and applied to new runs. Model and budget settings are managed by the backend environment.</Note><Button type="submit">Save preferences</Button></form></Panel><div className="stack"><Panel title="Model & connection"><div className="panel-pad"><div className="switch-line"><div><h3>Backend</h3><p>Python API through the Next.js server</p></div><span className="connection-line"><span className={`status-dot ${online ? '' : 'offline'}`} />{online ? 'Connected' : 'Offline'}</span></div><div className="switch-line"><div><h3>OpenRouter model</h3><p className="setting-value">{config.model || 'Not configured'}</p></div></div><div className="switch-line"><div><h3>API version</h3><p>{config.version || '—'}</p></div><a href="/docs" target="_blank" rel="noopener" className="text-link">API docs<Icon name="external" /></a></div></div></Panel><Panel title="Workspace budget"><div className="panel-pad"><div style={{ display: 'flex', justifyContent: 'space-between' }}><h3>{money(config.spent_usd)} spent</h3><span className="split-note">${Number(config.budget_usd || 4).toFixed(2)} cap</span></div><div className="progress-track"><span style={{ width: `${Math.min(100, (config.spent_usd || 0) / (config.budget_usd || 4) * 100)}%` }} /></div><p style={{ marginTop: 15, fontSize: 10 }}>Recorded model spend. The backend checks the configured budget before each model request.</p></div></Panel></div></div></>;
+
+  async function saveEmailConfig(e) {
+    e.preventDefault(); setEmailPending(true); setEmailMsg('');
+    const data = new FormData(e.currentTarget);
+    const body = {
+      email_agent: data.get('email_agent'),
+      mode: data.get('email_mode'),
+      dry_run: data.has('dry_run'),
+      send_allowlist: allowlistInput.split(',').map(s => s.trim()).filter(Boolean),
+    };
+    try {
+      await post('/email/config', body);
+      await refresh();
+      setEmailMsg('Email agent settings saved.');
+    } catch (err) { setEmailMsg(`Error: ${err.message}`); }
+    finally { setEmailPending(false); }
+  }
+
+  const es = emailStatus;
+  return <><Header title="Settings" description="Your workspace configuration and execution preferences." />
+    <div className="two-columns">
+      <Panel title="Execution defaults" subtitle="Used when starting a new agent run">
+        <form className="panel-pad" onSubmit={submit} key={JSON.stringify(preferences)}>
+          <Field label="Defense mode" name="defense"><DefenseSelect defaultValue={preferences.defense} /></Field>
+          <Field label="Injection neutralization" name="neutralize"><NeutralizeSelect defaultValue={preferences.neutralize} /></Field>
+          <label className="switch-line"><span><h3>Filter final answers</h3><p>Check sensitive content and grounding</p></span><input className="switch" type="checkbox" name="output_filter" defaultChecked={preferences.output_filter} /></label>
+          <Note>Preferences are saved in this browser and applied to new runs. Model and budget settings are managed by the backend environment.</Note>
+          <Button type="submit">Save preferences</Button>
+        </form>
+      </Panel>
+      <div className="stack">
+        <Panel title="Model &amp; connection">
+          <div className="panel-pad">
+            <div className="switch-line"><div><h3>Backend</h3><p>Python API through the Next.js server</p></div><span className="connection-line"><span className={`status-dot ${online ? '' : 'offline'}`} />{online ? 'Connected' : 'Offline'}</span></div>
+            <div className="switch-line"><div><h3>OpenRouter model</h3><p className="setting-value">{config.model || 'Not configured'}</p></div></div>
+            <div className="switch-line"><div><h3>API version</h3><p>{config.version || '—'}</p></div><a href="/docs" target="_blank" rel="noopener" className="text-link">API docs<Icon name="external" /></a></div>
+          </div>
+        </Panel>
+        <Panel title="Workspace budget">
+          <div className="panel-pad">
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><h3>{money(config.spent_usd)} spent</h3><span className="split-note">${Number(config.budget_usd || 4).toFixed(2)} cap</span></div>
+            <div className="progress-track"><span style={{ width: `${Math.min(100, (config.spent_usd || 0) / (config.budget_usd || 4) * 100)}%` }} /></div>
+            <p style={{ marginTop: 15, fontSize: 10 }}>Recorded model spend. The backend checks the configured budget before each model request.</p>
+          </div>
+        </Panel>
+      </div>
+    </div>
+
+    <SectionHeading title="Email agent" />
+    <div className="two-columns">
+      <Panel title="Email agent configuration" subtitle="Controls how the email agent accesses your mailbox">
+        <form className="panel-pad" onSubmit={saveEmailConfig}>
+          <div className="field"><label htmlFor="email_agent">Data source</label>
+            <select id="email_agent" name="email_agent" defaultValue={es?.configured_agent || 'mock'}>
+              <option value="mock">Mock environment (isolated JSON)</option>
+              <option value="real">Real email (IMAP / Gmail)</option>
+            </select>
+          </div>
+          <div className="field"><label htmlFor="email_mode">Operation mode</label>
+            <select id="email_mode" name="email_mode" defaultValue={es?.mode || 'readonly'}>
+              <option value="readonly">Read-only</option>
+              <option value="draft_only">Draft only</option>
+              <option value="draft">Draft + read</option>
+              <option value="full">Full (send enabled)</option>
+            </select>
+          </div>
+          <label className="switch-line">
+            <span><h3>Dry-run mode</h3><p>Simulate writes without touching the mailbox</p></span>
+            <input className="switch" type="checkbox" name="dry_run" defaultChecked={es?.dry_run !== false} />
+          </label>
+          <div className="field">
+            <label htmlFor="allowlist">Send allowlist <small>(comma-separated)</small></label>
+            <input id="allowlist" value={allowlistInput} onChange={e => setAllowlistInput(e.target.value)} placeholder="alice@example.com, bob@example.com" />
+          </div>
+          {emailMsg && <div className={emailMsg.startsWith('Error') ? 'error-banner' : 'note'} role="status">{emailMsg}</div>}
+          <Note>Changes take effect immediately for new runs. Dry-run and allowlist are safety backstops in addition to the security gate.</Note>
+          <Button type="submit" disabled={emailPending}>{emailPending ? 'Saving…' : 'Save email settings'}</Button>
+        </form>
+      </Panel>
+      <Panel title="Email backend status">
+        <div className="panel-pad">
+          {es ? <>
+            <div className="switch-line"><div><h3>Active agent</h3></div><Badge value={es.active_agent || es.configured_agent || 'mock'} /></div>
+            <div className="switch-line"><div><h3>Backend type</h3><p>{es.backend_type}</p></div></div>
+            <div className="switch-line"><div><h3>Dry-run</h3></div><Badge value={es.dry_run ? 'on' : 'off'} /></div>
+            <div className="switch-line"><div><h3>Mode</h3></div><Badge value={es.mode || 'readonly'} /></div>
+            {es.inbox_stats?.unread != null && <div className="switch-line"><div><h3>Inbox</h3><p>{es.inbox_stats.unread} unread / {es.inbox_stats.total} total</p></div></div>}
+            {es.inbox_stats?.error && <Note>Inbox probe: {es.inbox_stats.error}</Note>}
+            <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid #edf0f4' }} />
+            <h3 style={{ fontSize: 12, marginBottom: 8 }}>Credentials</h3>
+            {es.auth?.error
+              ? <div className="error-banner" style={{ fontSize: 12 }}>{es.auth.error}</div>
+              : <div className="switch-line"><div><h3>{es.auth?.type === 'imap' ? 'IMAP' : 'Gmail OAuth'}</h3><p>{es.auth?.type === 'imap' ? es.auth?.host || 'host not set' : es.auth?.credentials_exist ? 'credentials.json found' : 'credentials.json missing'}</p></div><Badge value={es.auth?.configured ? 'configured' : 'missing'} /></div>
+            }
+          </> : <div className="loading">Loading email status…</div>}
+        </div>
+      </Panel>
+    </div>
+  </>;
 }
