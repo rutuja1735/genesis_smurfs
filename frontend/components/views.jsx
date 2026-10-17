@@ -7,13 +7,159 @@ import { active, date, download, money, pretty, post } from '../lib/api';
 import { AgentCards } from './agents';
 import { Badge, Button, Chart, DefenseSelect, Empty, Field, Header, Icon, NeutralizeSelect, Note, Panel, RunTable, SectionHeading, Stat } from './ui';
 export function Overview() {
-  const { runs, stats, loading, newRun } = useWorkspace();
+  const { runs, stats, loading, newRun, emailStatus, config } = useWorkspace();
   const [mode, setMode] = useState('runs');
   const done = runs.filter(r => r.status === 'done').length;
   const running = runs.filter(r => active(r.status)).length;
-  return <><Header title="Welcome back, Founder" description="Your agent workspace"><span className="date-pill"><Icon name="calendar" />{new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', month: 'short', day: 'numeric' })}</span></Header><div className="stats">
-    <Stat label="Runs completed" value={done} detail={`${runs.length} total runs`} icon="check" green /><Stat label="Active agents" value="3" detail="Email, Slack, and Banking" icon="agents" /><Stat label="Execution progress" value={`${runs.length ? Math.round(done / runs.length * 100) : 0}%`} detail={`${running} runs currently in progress`} icon="clock" /><Stat label="Threats blocked" value={stats.decisions.BLOCK || 0} detail="Deterministic policy protection" icon="shield" />
-  </div><div className="grid-main"><Panel title="Execution over time" action={<select className="compact" aria-label="Chart metric" value={mode} onChange={e => setMode(e.target.value)}><option value="runs">Agent runs</option><option value="done">Runs completed</option></select>}><Chart runs={runs} mode={mode} /></Panel><Panel title="Quick actions"><div className="quick-actions"><button className="quick-action" onClick={() => newRun()}><Icon name="play" /><span><strong>New agent run</strong><small>Give your agents a task</small></span><Icon name="chevron" className="arrow" /></button><Link className="quick-action" href="/agents"><Icon name="agents" /><span><strong>Explore your agents</strong><small>Email, Slack, and Banking</small></span><Icon name="chevron" className="arrow" /></Link><Link className="quick-action" href="/testing"><Icon name="shield" /><span><strong>Test your defenses</strong><small>Run an injection scenario</small></span><Icon name="chevron" className="arrow" /></Link></div></Panel></div><SectionHeading title="Your agents" href="/agents" label="View all agents" /><AgentCards /><SectionHeading title="Recent execution" href="/runs" label="View all runs" /><section className="panel">{loading ? <div className="loading">Loading execution history…</div> : <RunTable runs={runs.slice(0, 5)} newRun={newRun} />}</section><div className="footer-note">Plan first. Execute safely. Keep a clear record.</div></>;
+  const blocked = stats.decisions.BLOCK || 0;
+  const reliability = runs.length ? Math.round(done / runs.length * 100) : 0;
+  const realEmailActive = emailStatus?.configured_agent === 'real';
+
+  return <>
+    {/* Hero banner */}
+    <div className="dash-hero">
+      <div className="dash-hero-bg" />
+      <div className="dash-hero-content">
+        <div className="dash-hero-text">
+          <span className="dash-hero-greeting"><Icon name="bolt" /> Welcome back, Founder</span>
+          <h1 className="dash-hero-title">Your agents are ready.</h1>
+          <p className="dash-hero-sub">{running > 0 ? `${running} run${running > 1 ? 's' : ''} in progress` : 'All systems clear'} · {done} runs completed · {blocked} threats blocked</p>
+        </div>
+        <div className="dash-hero-actions">
+          <Button icon="play" variant="blue" onClick={() => newRun()}>New agent run</Button>
+          <Link href="/agents"><Button icon="agents" variant="secondary">Explore agents</Button></Link>
+        </div>
+      </div>
+      {/* Defense posture strip */}
+      <div className="defense-strip">
+        <div className="defense-item"><span className="defense-dot active" /><Icon name="shield" /><span>Plan-first defense</span></div>
+        <div className="defense-item"><span className="defense-dot active" /><Icon name="search" /><span>Injection scanning</span></div>
+        <div className="defense-item"><span className="defense-dot active" /><Icon name="check" /><span>Output filtering</span></div>
+        <div className="defense-item"><span className={`defense-dot ${realEmailActive ? 'active' : 'warn'}`} /><Icon name="mail" /><span>{realEmailActive ? 'Real email connected' : 'Mock email mode'}</span></div>
+      </div>
+    </div>
+
+    {/* Stat cards */}
+    <div className="dash-stats">
+      <div className="dash-stat green">
+        <div className="dash-stat-icon"><Icon name="check" /></div>
+        <div className="dash-stat-value">{done}</div>
+        <div className="dash-stat-label">Runs completed</div>
+        <div className="dash-stat-detail">{runs.length} total runs</div>
+      </div>
+      <div className="dash-stat blue">
+        <div className="dash-stat-icon"><Icon name="agents" /></div>
+        <div className="dash-stat-value">3</div>
+        <div className="dash-stat-label">Active agents</div>
+        <div className="dash-stat-detail">Email · Slack · Banking</div>
+      </div>
+      <div className="dash-stat purple">
+        <div className="dash-stat-icon"><Icon name="clock" /></div>
+        <div className="dash-stat-value">{runs.length ? Math.round(done / runs.length * 100) : 0}%</div>
+        <div className="dash-stat-label">Execution progress</div>
+        <div className="dash-stat-detail">{running} runs in progress</div>
+      </div>
+      <div className="dash-stat red">
+        <div className="dash-stat-icon"><Icon name="shield" /></div>
+        <div className="dash-stat-value">{blocked}</div>
+        <div className="dash-stat-label">Threats blocked</div>
+        <div className="dash-stat-detail">Deterministic policy</div>
+      </div>
+    </div>
+
+    {/* Main grid: chart + quick actions */}
+    <div className="grid-main">
+      <Panel title="Execution over time" action={<select className="compact" aria-label="Chart metric" value={mode} onChange={e => setMode(e.target.value)}><option value="runs">Agent runs</option><option value="done">Runs completed</option></select>}>
+        <Chart runs={runs} mode={mode} />
+      </Panel>
+      <div className="dash-side">
+        <Panel title="Quick actions">
+          <div className="quick-actions">
+            <button className="quick-action qa-primary" onClick={() => newRun()}>
+              <span className="qa-icon qa-icon-blue"><Icon name="play" /></span>
+              <span><strong>New agent run</strong><small>Give your agents a task</small></span>
+              <Icon name="chevron" className="arrow" />
+            </button>
+            <Link className="quick-action" href="/agents">
+              <span className="qa-icon qa-icon-purple"><Icon name="agents" /></span>
+              <span><strong>Explore your agents</strong><small>Email, Slack, and Banking</small></span>
+              <Icon name="chevron" className="arrow" />
+            </Link>
+            <Link className="quick-action" href="/testing">
+              <span className="qa-icon qa-icon-red"><Icon name="shield" /></span>
+              <span><strong>Test your defenses</strong><small>Run an injection scenario</small></span>
+              <Icon name="chevron" className="arrow" />
+            </Link>
+            <Link className="quick-action" href="/analytics">
+              <span className="qa-icon qa-icon-green"><Icon name="chart" /></span>
+              <span><strong>View analytics</strong><small>Execution insights and trends</small></span>
+              <Icon name="chevron" className="arrow" />
+            </Link>
+          </div>
+        </Panel>
+        {/* Email status widget */}
+        {emailStatus && (
+          <Panel title="Email agent status">
+            <div className="email-widget">
+              <div className="email-widget-row">
+                <span className="email-widget-label">Mode</span>
+                <span className={`email-widget-badge ${realEmailActive ? 'real' : 'mock'}`}>{emailStatus.configured_agent}</span>
+              </div>
+              <div className="email-widget-row">
+                <span className="email-widget-label">Backend</span>
+                <span className="email-widget-value">{emailStatus.backend_type}</span>
+              </div>
+              <div className="email-widget-row">
+                <span className="email-widget-label">Dry-run</span>
+                <span className={`email-widget-badge ${emailStatus.dry_run ? 'on' : 'off'}`}>{emailStatus.dry_run ? 'ON' : 'OFF'}</span>
+              </div>
+              {emailStatus.inbox_stats?.total != null && (
+                <div className="email-widget-inbox">
+                  <Icon name="mail" />
+                  <span>{emailStatus.inbox_stats.unread} unread</span>
+                  <span className="email-widget-sep">·</span>
+                  <span>{emailStatus.inbox_stats.total} total</span>
+                </div>
+              )}
+              <Link href="/agents/email" className="email-widget-link">Open email workspace <Icon name="arrow" /></Link>
+            </div>
+          </Panel>
+        )}
+      </div>
+    </div>
+
+    {/* Agent cards */}
+    <SectionHeading title="Your agents" href="/agents" label="View all agents" />
+    <AgentCards />
+
+    {/* Recent runs */}
+    <SectionHeading title="Recent execution" href="/runs" label="View all runs" />
+    <section className="panel">
+      {loading ? <div className="loading">Loading execution history…</div> : runs.length === 0 ? (
+        <Empty title="No agent runs yet" description="Give an agent a task to see its execution and policy decisions here.">
+          <Button icon="plus" variant="small" onClick={() => newRun()}>Start your first run</Button>
+        </Empty>
+      ) : (
+        <div className="dash-runs-grid">
+          {runs.slice(0, 6).map(r => (
+            <Link key={r.run_id} href={`/runs/${r.run_id}`} className="dash-run-card">
+              <div className="dash-run-top">
+                <Badge value={r.status} />
+                <span className="dash-run-defense">{r.defense === 'ours' ? 'Plan-first' : pretty(r.defense)}</span>
+              </div>
+              <div className="dash-run-command">{r.command}</div>
+              <div className="dash-run-bottom">
+                <span><Icon name="clock" />{date(r.created_at)}</span>
+                {r.track === 'real' && <span className="dash-run-real"><Icon name="mail" />Real email</span>}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <div className="footer-note">Plan first. Execute safely. Keep a clear record.</div>
+  </>;
 }
 
 export function Runs() {
